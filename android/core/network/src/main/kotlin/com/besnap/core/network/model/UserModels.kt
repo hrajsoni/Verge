@@ -28,3 +28,21 @@ data class InterestDto(
     val label: String,
     val emoji: String,
 )
+
+@JsonClass(generateAdapter = true)
+data class DiscoverFeedItemDto(
+    val userId: String,
+    val displayName: String,
+    val age: Int,
+    val distanceKm: Double,
+    val bio: String,
+    val interests: List<InterestDto>,
+    val photos: List<String>,
+    val lookingFor: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SwipeResponseDto(
+    val matched: Boolean,
+    val matchId: String? = null
+)

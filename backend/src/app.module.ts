@@ -8,6 +8,15 @@ import { UsersModule } from './users/users.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { InterestsModule } from './interests/interests.module';
 import { HealthModule } from './health/health.module';
+import { LocationModule } from './location/location.module';
+import { DiscoveryModule } from './discovery/discovery.module';
+import { SwipesModule } from './swipes/swipes.module';
+import { MatchingModule } from './matching/matching.module';
+
+import { MediaModule } from './media/media.module';
+import { ChatModule } from './chat/chat.module';
+import { CallsModule } from './calls/calls.module';
+import { SafetyModule } from './safety/safety.module';
 
 @Module({
   imports: [
@@ -19,6 +28,14 @@ import { HealthModule } from './health/health.module';
     ProfilesModule,
     InterestsModule,
     HealthModule,
+    LocationModule,
+    DiscoveryModule,
+    SwipesModule,
+    MatchingModule,
+    MediaModule,
+    ChatModule,
+    CallsModule,
+    SafetyModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

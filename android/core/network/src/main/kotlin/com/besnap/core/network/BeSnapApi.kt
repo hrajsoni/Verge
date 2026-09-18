@@ -22,4 +22,13 @@ interface BeSnapApi {
 
     @GET("interests")
     suspend fun getInterests(): List<InterestDto>
+
+    @GET("discover/feed")
+    suspend fun getFeed(): List<com.besnap.core.network.model.DiscoverFeedItemDto>
+
+    @POST("discover/like/{userId}")
+    suspend fun likeUser(@retrofit2.http.Path("userId") userId: String): com.besnap.core.network.model.SwipeResponseDto
+
+    @POST("discover/pass/{userId}")
+    suspend fun passUser(@retrofit2.http.Path("userId") userId: String)
 }
