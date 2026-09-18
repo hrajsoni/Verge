@@ -1,0 +1,3 @@
+sdk.dir=C:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
+CAMERAKIT_API_TOKEN=replace-me
+API_BASE_URL=http://10.0.2.2:3000/v1/

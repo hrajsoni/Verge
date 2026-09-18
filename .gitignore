@@ -1,0 +1,42 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+local.properties
+**/google-services.json
+**/GoogleService-Info.plist
+**/camerakit.properties
+**/secrets.properties
+
+# Node
+node_modules/
+dist/
+coverage/
+.turbo/
+*.log
+npm-debug.log*
+
+# Android
+android/.gradle/
+android/**/build/
+android/**/.cxx/
+android/captures/
+android/*.apk
+android/*.aab
+android/app/release/
+*.keystore
+*.jks
+
+# Prisma
+backend/generated/
+
+# Misc
+*.swp
+.cursor/

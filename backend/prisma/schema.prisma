@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  WARNING
+  RESTRICTED
+  SUSPENDED
+  BANNED
+  DELETED
+}
+
+enum AuthProvider {
+  GOOGLE
+  PHONE
+  EMAIL
+}
+
+enum Gender {
+  MAN
+  WOMAN
+  NON_BINARY
+  OTHER
+  UNDISCLOSED
+}
+
+enum LookingFor {
+  FRIENDS
+  DATING
+  FRIENDS_AND_DATING
+}
+
+enum MessageType {
+  TEXT
+  PHOTO
+  VIDEO
+  VOICE
+  SNAP
+  SYSTEM
+}
+
+enum SnapViewState {
+  SENT
+  DELIVERED
+  OPENED
+  EXPIRED
+}
+
+enum CallKind {
+  VOICE
+  VIDEO
+}
+
+enum CallState {
+  CALLING
+  RINGING
+  CONNECTED
+  ENDING
+  ENDED
+  REJECTED
+  MISSED
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  VOICE
+  SNAP
+  AVATAR
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVIEW
+}
+
+enum ReportCategory {
+  SPAM
+  HARASSMENT
+  FAKE_ACCOUNT
+  NUDITY
+  THREATENING
+  SCAM
+  UNDERAGE
+  OTHER
+}
+
+enum ReportStatus {
+  NEW
+  INVESTIGATING
+  RESOLVED
+  ESCALATED
+}
+
+enum NotificationCategory {
+  MATCH
+  MESSAGE
+  SNAP
+  VOICE_MESSAGE
+  INCOMING_CALL
+  MISSED_CALL
+  LIKE
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String?       @unique
+  phone          String?       @unique
+  googleSub      String?       @unique
+  passwordHash   String?
+  dateOfBirth    DateTime
+  status         AccountStatus @default(ACTIVE)
+  lastActiveAt   DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  onboardingDone Boolean       @default(false)
+
+  profile       Profile?
+  preferences   DiscoveryPreference?
+  location      UserLocation?
+  interests     UserInterest[]
+  photos        ProfilePhoto[]
+  likesSent     Like[]               @relation("LikesSent")
+  likesReceived Like[]               @relation("LikesReceived")
+  passesSent    Pass[]               @relation("PassesSent")
+  matchesA      Match[]              @relation("MatchesA")
+  matchesB      Match[]              @relation("MatchesB")
+  memberships   ConversationMember[]
+  messages      Message[]
+  media         MediaAsset[]
+  calls         CallParticipant[]
+  blocksSent    Block[]              @relation("BlocksSent")
+  blocksReceived Block[]             @relation("BlocksReceived")
+  reportsSent   Report[]             @relation("ReportsSent")
+  reportsAbout  Report[]             @relation("ReportsAbout")
+  devices       DeviceToken[]
+  notifications Notification[]
+  moderation    ModerationAction[]   @relation("ModerationTarget")
+}
+
+model Profile {
+  id          String     @id @default(uuid())
+  userId      String     @unique
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  bio         String     @default("")
+  gender      Gender     @default(UNDISCLOSED)
+  lookingFor  LookingFor @default(FRIENDS)
+  verified    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Interest {
+  id    String         @id @default(uuid())
+  slug  String         @unique
+  label String
+  emoji String
+  users UserInterest[]
+}
+
+model UserInterest {
+  userId     String
+  interestId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+}
+
+model DiscoveryPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minAge          Int      @default(18)
+  maxAge          Int      @default(35)
+  maxDistanceKm   Int      @default(25)
+  genders         Gender[]
+  lookingFor      LookingFor[]
+  updatedAt       DateTime @updatedAt
+}
+
+model UserLocation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latitude  Float
+  longitude Float
+  geohash   String
+  updatedAt DateTime @updatedAt
+}
+
+model ProfilePhoto {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     MediaAsset @relation(fields: [mediaId], references: [id])
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("LikesSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("LikesReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId])
+}
+
+model Pass {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("PassesSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  userA     User     @relation("MatchesA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("MatchesB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  unmatchedAt DateTime?
+
+  conversation Conversation?
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+}
+
+model Conversation {
+  id        String               @id @default(uuid())
+  matchId   String?              @unique
+  match     Match?               @relation(fields: [matchId], references: [id])
+  createdAt DateTime             @default(now())
+  members   ConversationMember[]
+  messages  Message[]
+  calls     Call[]
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+  muted          Boolean      @default(false)
+
+  @@id([conversationId, userId])
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  type           MessageType
+  text           String?
+  mediaId        String?
+  media          MediaAsset?   @relation(fields: [mediaId], references: [id])
+  snapExpiresAt  DateTime?
+  snapViewState  SnapViewState?
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model MediaAsset {
+  id               String           @id @default(uuid())
+  ownerId          String
+  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  type             MediaType
+  objectKey        String
+  thumbnailKey     String?
+  mimeType         String
+  sizeBytes        Int
+  durationMs       Int?
+  moderationStatus ModerationStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  messages         Message[]
+  photos           ProfilePhoto[]
+}
+
+model Call {
+  id             String            @id @default(uuid())
+  conversationId String
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  kind           CallKind
+  state          CallState
+  startedAt      DateTime          @default(now())
+  connectedAt    DateTime?
+  endedAt        DateTime?
+  participants   CallParticipant[]
+  events         CallEvent[]
+}
+
+model CallParticipant {
+  id      String @id @default(uuid())
+  callId  String
+  userId  String
+  call    Call   @relation(fields: [callId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    String
+
+  @@unique([callId, userId])
+}
+
+model CallEvent {
+  id        String   @id @default(uuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now())
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  blocker   User     @relation("BlocksSent", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model Report {
+  id         String         @id @default(uuid())
+  reporterId String
+  targetId   String
+  reporter   User           @relation("ReportsSent", fields: [reporterId], references: [id], onDelete: Cascade)
+  target     User           @relation("ReportsAbout", fields: [targetId], references: [id], onDelete: Cascade)
+  category   ReportCategory
+  details    String         @default("")
+  status     ReportStatus   @default(NEW)
+  createdAt  DateTime       @default(now())
+}
+
+model ModerationAction {
+  id         String   @id @default(uuid())
+  targetId   String
+  target     User     @relation("ModerationTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  actorId    String
+  action     String
+  reason     String
+  createdAt  DateTime @default(now())
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String               @id @default(uuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  NotificationCategory
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime             @default(now())
+}
+
+model LensCatalog {
+  id        String   @id @default(uuid())
+  groupId   String
+  name      String
+  category  String
+  sortOrder Int      @default(0)
+  enabled   Boolean  @default(true)
+  version   String
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         String
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model AuthChallenge {
+  id        String   @id @default(uuid())
+  target    String
+  codeHash  String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([target])
+}
