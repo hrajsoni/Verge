@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CallsService } from './calls.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CallKind, CallState } from '@prisma/client';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 
 describe('CallsService', () => {
   let service: CallsService;
@@ -42,20 +46,25 @@ describe('CallsService', () => {
   describe('initiateCall', () => {
     it('should throw NotFoundException if conversation not found', async () => {
       mockPrismaService.conversation.findUnique.mockResolvedValue(null);
-      
-      await expect(service.initiateCall('callerId', {
-        conversationId: 'convId',
-        kind: CallKind.VOICE,
-      })).rejects.toThrow(NotFoundException);
+
+      await expect(
+        service.initiateCall('callerId', {
+          conversationId: 'convId',
+          kind: CallKind.VOICE,
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should create a call successfully', async () => {
       mockPrismaService.conversation.findUnique.mockResolvedValue({
         id: 'convId',
-        members: [{ userId: 'callerId' }, { userId: 'otherId' }]
+        members: [{ userId: 'callerId' }, { userId: 'otherId' }],
       });
       mockPrismaService.call.findFirst.mockResolvedValue(null);
-      mockPrismaService.call.create.mockResolvedValue({ id: 'callId', state: CallState.CALLING });
+      mockPrismaService.call.create.mockResolvedValue({
+        id: 'callId',
+        state: CallState.CALLING,
+      });
 
       const result = await service.initiateCall('callerId', {
         conversationId: 'convId',
@@ -72,11 +81,11 @@ describe('CallsService', () => {
       mockPrismaService.call.findUnique.mockResolvedValue({
         id: 'callId',
         state: CallState.CALLING,
-        participants: [{ userId: 'userId' }]
+        participants: [{ userId: 'userId' }],
       });
       mockPrismaService.call.update.mockResolvedValue({
         id: 'callId',
-        state: CallState.CONNECTED
+        state: CallState.CONNECTED,
       });
 
       const result = await service.acceptCall('userId', 'callId');

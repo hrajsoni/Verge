@@ -37,8 +37,6 @@ import { SafetyModule } from './safety/safety.module';
     CallsModule,
     SafetyModule,
   ],
-  providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-  ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

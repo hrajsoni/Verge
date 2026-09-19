@@ -24,13 +24,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth.token || client.handshake.headers['authorization']?.split(' ')[1];
+      const token =
+        client.handshake.auth.token ||
+        client.handshake.headers['authorization']?.split(' ')[1];
       if (!token) {
         client.disconnect();
         return;
       }
-      
-      const payload = this.jwtService.verify(token, { secret: process.env.JWT_SECRET || 'change-me-in-production' });
+
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET || 'change-me-in-production',
+      });
       client.data.userId = payload.sub;
     } catch (e) {
       client.disconnect();
@@ -47,7 +51,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { conversationId: string },
   ) {
     try {
-      await this.chatService.checkMembership(client.data.userId, data.conversationId);
+      await this.chatService.checkMembership(
+        client.data.userId,
+        data.conversationId,
+      );
       client.join(`conversation_${data.conversationId}`);
     } catch (e) {
       // Not a member
@@ -74,10 +81,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data.message,
       );
 
-      this.server.to(`conversation_${data.conversationId}`).emit('new_message', {
-        conversationId: data.conversationId,
-        message,
-      });
+      this.server
+        .to(`conversation_${data.conversationId}`)
+        .emit('new_message', {
+          conversationId: data.conversationId,
+          message,
+        });
     } catch (e) {
       // Error handling
     }
@@ -112,10 +121,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     try {
       await this.chatService.markRead(client.data.userId, data.conversationId);
-      this.server.to(`conversation_${data.conversationId}`).emit('messages_read', {
-        conversationId: data.conversationId,
-        userId: client.data.userId,
-      });
+      this.server
+        .to(`conversation_${data.conversationId}`)
+        .emit('messages_read', {
+          conversationId: data.conversationId,
+          userId: client.data.userId,
+        });
     } catch (e) {
       // Error handling
     }

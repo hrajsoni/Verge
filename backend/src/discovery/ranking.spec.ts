@@ -18,7 +18,7 @@ describe('discovery ranking', () => {
   const base: RankableProfile = {
     id: 'a',
     age: 24,
-    gender: 'UNDISCLOSED' as RankableProfile['gender'],
+    gender: 'UNDISCLOSED',
     lookingFor: LookingFor.FRIENDS,
     distanceKm: 2,
     sharedInterestCount: 3,

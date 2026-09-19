@@ -46,7 +46,9 @@ describe('ChatService', () => {
   describe('checkMembership', () => {
     it('should throw ForbiddenException if user is not a member', async () => {
       mockPrisma.conversationMember.findUnique.mockResolvedValue(null);
-      await expect(service.checkMembership('user-1', 'conv-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.checkMembership('user-1', 'conv-1')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should return member if user is a member', async () => {
@@ -75,26 +77,38 @@ describe('ChatService', () => {
       const dto = { type: MessageType.SNAP, text: '' };
       const mockMember = { conversationId: 'conv-1', userId: 'user-1' };
       mockPrisma.conversationMember.findUnique.mockResolvedValue(mockMember);
-      mockPrisma.message.create.mockResolvedValue({ id: 'msg-1', snapViewState: SnapViewState.CREATED, ...dto });
+      mockPrisma.message.create.mockResolvedValue({
+        id: 'msg-1',
+        snapViewState: SnapViewState.CREATED,
+        ...dto,
+      });
 
       await service.sendMessage('user-1', 'conv-1', dto);
-      expect(mockPrisma.message.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          snapViewState: SnapViewState.CREATED,
+      expect(mockPrisma.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            snapViewState: SnapViewState.CREATED,
+          }),
         }),
-      }));
+      );
     });
   });
 
   describe('openSnap', () => {
     it('should throw NotFoundException if message not found', async () => {
       mockPrisma.message.findUnique.mockResolvedValue(null);
-      await expect(service.openSnap('user-1', 'msg-1')).rejects.toThrow(NotFoundException);
+      await expect(service.openSnap('user-1', 'msg-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw ForbiddenException if message is not a snap', async () => {
-      mockPrisma.message.findUnique.mockResolvedValue({ type: MessageType.TEXT });
-      await expect(service.openSnap('user-1', 'msg-1')).rejects.toThrow(ForbiddenException);
+      mockPrisma.message.findUnique.mockResolvedValue({
+        type: MessageType.TEXT,
+      });
+      await expect(service.openSnap('user-1', 'msg-1')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ForbiddenException if opening own snap', async () => {
@@ -102,7 +116,9 @@ describe('ChatService', () => {
         type: MessageType.SNAP,
         senderId: 'user-1',
       });
-      await expect(service.openSnap('user-1', 'msg-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.openSnap('user-1', 'msg-1')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should update snap to OPENED and set expiresAt', async () => {
@@ -114,16 +130,21 @@ describe('ChatService', () => {
       });
       const mockMember = { conversationId: 'conv-1', userId: 'user-1' };
       mockPrisma.conversationMember.findUnique.mockResolvedValue(mockMember);
-      mockPrisma.message.update.mockResolvedValue({ id: 'msg-1', snapViewState: SnapViewState.OPENED });
+      mockPrisma.message.update.mockResolvedValue({
+        id: 'msg-1',
+        snapViewState: SnapViewState.OPENED,
+      });
 
       const res = await service.openSnap('user-1', 'msg-1');
       expect(res.snapViewState).toEqual(SnapViewState.OPENED);
-      expect(mockPrisma.message.update).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          snapViewState: SnapViewState.OPENED,
-          snapExpiresAt: expect.any(Date),
+      expect(mockPrisma.message.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            snapViewState: SnapViewState.OPENED,
+            snapExpiresAt: expect.any(Date),
+          }),
         }),
-      }));
+      );
     });
   });
 });

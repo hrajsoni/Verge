@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockUserDto, ReportUserDto } from './safety.dto';
 import { AccountStatus, ReportStatus } from '@prisma/client';
@@ -12,7 +16,9 @@ export class SafetyService {
       throw new BadRequestException('You cannot block yourself');
     }
 
-    const targetUser = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
     if (!targetUser) {
       throw new NotFoundException('Target user not found');
     }

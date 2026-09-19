@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto, RequestOtpDto, VerifyOtpDto } from './dto';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -26,12 +27,11 @@ export class AuthController {
     return this.auth.verifyOtp(dto);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('google')
-  googleLogin(
-    @Body() dto: import('./dto').GoogleAuthDto,
-    @Req() req: any,
-  ) {
-    const ip = req.ip || req.headers?.['x-forwarded-for']?.toString() || '127.0.0.1';
+  googleLogin(@Body() dto: import('./dto').GoogleAuthDto, @Req() req: any) {
+    const ip =
+      req.ip || req.headers?.['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers?.['user-agent'];
     return this.auth.googleLogin(dto, ip, userAgent);
   }

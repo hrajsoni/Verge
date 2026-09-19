@@ -34,10 +34,7 @@ export class CallsController {
   }
 
   @Post(':id/end')
-  async endCall(
-    @CurrentUserId() userId: string,
-    @Param('id') callId: string,
-  ) {
+  async endCall(@CurrentUserId() userId: string, @Param('id') callId: string) {
     return this.callsService.endCall(userId, callId);
   }
 

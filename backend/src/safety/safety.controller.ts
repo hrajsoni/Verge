@@ -1,4 +1,12 @@
-import { Controller, Post, Delete, Get, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { SafetyService } from './safety.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUserId } from '../auth/current-user';
@@ -15,7 +23,10 @@ export class SafetyController {
   }
 
   @Delete('blocks/:targetUserId')
-  unblockUser(@CurrentUserId() userId: string, @Param('targetUserId') targetUserId: string) {
+  unblockUser(
+    @CurrentUserId() userId: string,
+    @Param('targetUserId') targetUserId: string,
+  ) {
     return this.safetyService.unblockUser(userId, targetUserId);
   }
 

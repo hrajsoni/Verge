@@ -27,11 +27,14 @@ export class DiscoveryService {
     });
 
     if (!user || !user.location || !user.preferences) {
-      throw new NotFoundException('User profile, location, or preferences missing');
+      throw new NotFoundException(
+        'User profile, location, or preferences missing',
+      );
     }
 
     const { latitude, longitude } = user.location;
-    const { minAge, maxAge, maxDistanceKm, genders, lookingFor } = user.preferences;
+    const { minAge, maxAge, maxDistanceKm, genders, lookingFor } =
+      user.preferences;
 
     const filters: DiscoveryFilters = {
       minAge,
@@ -51,7 +54,16 @@ export class DiscoveryService {
     ]);
     const userInterestIds = new Set(user.interests.map((i) => i.interestId));
 
+    const latDelta = maxDistanceKm / 111;
+    const lonDelta =
+      maxDistanceKm / (111 * Math.cos((latitude * Math.PI) / 180));
+    const minLat = latitude - latDelta;
+    const maxLat = latitude + latDelta;
+    const minLon = longitude - lonDelta;
+    const maxLon = longitude + lonDelta;
+
     const candidates = await this.prisma.user.findMany({
+      take: 200,
       where: {
         id: { not: userId },
         status: 'ACTIVE',
@@ -70,39 +82,56 @@ export class DiscoveryService {
       },
     });
 
-    const rankableProfiles: (RankableProfile & { raw: any })[] = candidates.map((candidate) => {
-      const distanceKm = haversineKm(
-        latitude,
-        longitude,
-        candidate.location!.latitude,
-        candidate.location!.longitude,
+    const filteredCandidates = candidates.filter((candidate) => {
+      const { latitude: candLat, longitude: candLon } = candidate.location!;
+      return (
+        candLat >= minLat &&
+        candLat <= maxLat &&
+        candLon >= minLon &&
+        candLon <= maxLon
       );
-      const age = candidate.dateOfBirth ? yearsSince(candidate.dateOfBirth) : 20;
-      const sharedInterestCount = candidate.interests.filter((i) =>
-        userInterestIds.has(i.interestId),
-      ).length;
-      const lastActiveHoursAgo =
-        (Date.now() - candidate.lastActiveAt.getTime()) / (1000 * 60 * 60);
-
-      return {
-        id: candidate.id,
-        age,
-        gender: candidate.profile!.gender,
-        lookingFor: candidate.profile!.lookingFor,
-        distanceKm,
-        sharedInterestCount,
-        profileComplete: candidate.photos.length > 0 && candidate.profile!.bio.length > 0,
-        lastActiveHoursAgo,
-        blocked: blockedIds.has(candidate.id),
-        alreadySwiped: swipedIds.has(candidate.id),
-        inactive: lastActiveHoursAgo > 24 * 7,
-        raw: candidate,
-      };
     });
 
-    const ranked = rankCandidates(rankableProfiles, filters) as (RankableProfile & { raw: any })[];
+    const rankableProfiles: (RankableProfile & { raw: any })[] =
+      filteredCandidates.map((candidate) => {
+        const distanceKm = haversineKm(
+          latitude,
+          longitude,
+          candidate.location!.latitude,
+          candidate.location!.longitude,
+        );
+        const age = candidate.dateOfBirth
+          ? yearsSince(candidate.dateOfBirth)
+          : 20;
+        const sharedInterestCount = candidate.interests.filter((i) =>
+          userInterestIds.has(i.interestId),
+        ).length;
+        const lastActiveHoursAgo =
+          (Date.now() - candidate.lastActiveAt.getTime()) / (1000 * 60 * 60);
 
-    return ranked.map((r) => {
+        return {
+          id: candidate.id,
+          age,
+          gender: candidate.profile!.gender,
+          lookingFor: candidate.profile!.lookingFor,
+          distanceKm,
+          sharedInterestCount,
+          profileComplete:
+            candidate.photos.length > 0 && candidate.profile!.bio.length > 0,
+          lastActiveHoursAgo,
+          blocked: blockedIds.has(candidate.id),
+          alreadySwiped: swipedIds.has(candidate.id),
+          inactive: lastActiveHoursAgo > 24 * 7,
+          raw: candidate,
+        };
+      });
+
+    const ranked = rankCandidates(
+      rankableProfiles,
+      filters,
+    ) as (RankableProfile & { raw: any })[];
+
+    return ranked.slice(0, 20).map((r) => {
       const { raw, distanceKm, age } = r;
       return {
         id: raw.id,

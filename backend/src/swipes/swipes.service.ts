@@ -76,10 +76,7 @@ export class SwipesService {
           create: {
             matchId: match.id,
             members: {
-              create: [
-                { userId: userAId },
-                { userId: userBId },
-              ],
+              create: [{ userId: userAId }, { userId: userBId }],
             },
           },
         });

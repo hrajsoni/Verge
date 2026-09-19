@@ -57,12 +57,19 @@ export class AuthService {
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       },
     });
-    return { sent: true, devCode: process.env.NODE_ENV === 'production' ? undefined : code };
+    return {
+      sent: true,
+      devCode: process.env.NODE_ENV === 'production' ? undefined : code,
+    };
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
     const challenge = await this.prisma.authChallenge.findFirst({
-      where: { target: dto.target, consumed: false, expiresAt: { gt: new Date() } },
+      where: {
+        target: dto.target,
+        consumed: false,
+        expiresAt: { gt: new Date() },
+      },
       orderBy: { createdAt: 'desc' },
     });
     if (!challenge) throw new UnauthorizedException();
@@ -73,7 +80,9 @@ export class AuthService {
       data: { consumed: true },
     });
 
-    const email = dto.target.includes('@') ? dto.target.toLowerCase() : undefined;
+    const email = dto.target.includes('@')
+      ? dto.target.toLowerCase()
+      : undefined;
     const phone = email ? undefined : dto.target;
     let user = email
       ? await this.prisma.user.findUnique({ where: { email } })
@@ -94,7 +103,11 @@ export class AuthService {
     return this.tokenFor(user.id);
   }
 
-  async googleLogin(dto: import('./dto').GoogleAuthDto, ipAddress: string, userAgent?: string) {
+  async googleLogin(
+    dto: import('./dto').GoogleAuthDto,
+    ipAddress: string,
+    userAgent?: string,
+  ) {
     const { OAuth2Client } = await import('google-auth-library');
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const client = new OAuth2Client(clientId);
@@ -108,7 +121,10 @@ export class AuthService {
       payload = ticket.getPayload();
     } catch {
       // In development / test environment, allow mock Google ID tokens
-      if (process.env.NODE_ENV !== 'production' && dto.idToken.startsWith('mock-google-token:')) {
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        dto.idToken.startsWith('mock-google-token:')
+      ) {
         const sub = dto.idToken.split(':')[1] || 'mock-sub-123';
         payload = {
           sub,

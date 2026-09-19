@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InitiateCallDto } from './calls.dto';
 import { CallState, CallKind } from '@prisma/client';
@@ -17,14 +22,18 @@ export class CallsService {
       throw new NotFoundException('Conversation not found');
     }
 
-    const callerMember = conversation.members.find(m => m.userId === callerId);
+    const callerMember = conversation.members.find(
+      (m) => m.userId === callerId,
+    );
     if (!callerMember) {
       throw new ForbiddenException('User is not a member of this conversation');
     }
 
-    const otherMember = conversation.members.find(m => m.userId !== callerId);
+    const otherMember = conversation.members.find((m) => m.userId !== callerId);
     if (!otherMember) {
-      throw new BadRequestException('Cannot initiate a call in an empty conversation');
+      throw new BadRequestException(
+        'Cannot initiate a call in an empty conversation',
+      );
     }
 
     const isBlocked = await this.prisma.block.findFirst({
@@ -41,7 +50,9 @@ export class CallsService {
 
     const activeCall = await this.getActiveCall(dto.conversationId);
     if (activeCall) {
-      throw new BadRequestException('An active call already exists in this conversation');
+      throw new BadRequestException(
+        'An active call already exists in this conversation',
+      );
     }
 
     const call = await this.prisma.call.create({
@@ -71,12 +82,15 @@ export class CallsService {
     });
 
     if (!call) throw new NotFoundException('Call not found');
-    
-    const participant = call.participants.find(p => p.userId === userId);
-    if (!participant) throw new ForbiddenException('Not a participant in this call');
+
+    const participant = call.participants.find((p) => p.userId === userId);
+    if (!participant)
+      throw new ForbiddenException('Not a participant in this call');
 
     if (call.state !== CallState.CALLING && call.state !== CallState.RINGING) {
-      throw new BadRequestException('Call cannot be accepted in its current state');
+      throw new BadRequestException(
+        'Call cannot be accepted in its current state',
+      );
     }
 
     return this.prisma.call.update({
@@ -96,9 +110,10 @@ export class CallsService {
     });
 
     if (!call) throw new NotFoundException('Call not found');
-    
-    const participant = call.participants.find(p => p.userId === userId);
-    if (!participant) throw new ForbiddenException('Not a participant in this call');
+
+    const participant = call.participants.find((p) => p.userId === userId);
+    if (!participant)
+      throw new ForbiddenException('Not a participant in this call');
 
     return this.prisma.call.update({
       where: { id: callId },
@@ -116,9 +131,10 @@ export class CallsService {
     });
 
     if (!call) throw new NotFoundException('Call not found');
-    
-    const participant = call.participants.find(p => p.userId === userId);
-    if (!participant) throw new ForbiddenException('Not a participant in this call');
+
+    const participant = call.participants.find((p) => p.userId === userId);
+    if (!participant)
+      throw new ForbiddenException('Not a participant in this call');
 
     return this.prisma.call.update({
       where: { id: callId },

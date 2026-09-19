@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './chat.dto';
 import { MessageType, SnapViewState } from '@prisma/client';
@@ -92,7 +96,12 @@ export class ChatService {
     return member;
   }
 
-  async getMessages(userId: string, conversationId: string, limit: number = 50, cursor?: string) {
+  async getMessages(
+    userId: string,
+    conversationId: string,
+    limit: number = 50,
+    cursor?: string,
+  ) {
     await this.checkMembership(userId, conversationId);
 
     const messages = await this.prisma.message.findMany({
@@ -109,7 +118,11 @@ export class ChatService {
     return messages;
   }
 
-  async sendMessage(userId: string, conversationId: string, dto: SendMessageDto) {
+  async sendMessage(
+    userId: string,
+    conversationId: string,
+    dto: SendMessageDto,
+  ) {
     await this.checkMembership(userId, conversationId);
 
     const otherMember = await this.prisma.conversationMember.findFirst({
@@ -190,7 +203,10 @@ export class ChatService {
 
     await this.checkMembership(userId, message.conversationId);
 
-    if (message.snapViewState === SnapViewState.OPENED || message.snapViewState === SnapViewState.EXPIRED) {
+    if (
+      message.snapViewState === SnapViewState.OPENED ||
+      message.snapViewState === SnapViewState.EXPIRED
+    ) {
       throw new ForbiddenException('Snap already opened or expired');
     }
 

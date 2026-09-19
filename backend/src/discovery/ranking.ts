@@ -26,7 +26,10 @@ export function lookingForCompatible(
   seeker: LookingFor,
   candidate: LookingFor,
 ): boolean {
-  if (seeker === LookingFor.FRIENDS_AND_DATING || candidate === LookingFor.FRIENDS_AND_DATING) {
+  if (
+    seeker === LookingFor.FRIENDS_AND_DATING ||
+    candidate === LookingFor.FRIENDS_AND_DATING
+  ) {
     return true;
   }
   return seeker === candidate;
@@ -36,15 +39,19 @@ export function passesFilters(
   profile: RankableProfile,
   filters: DiscoveryFilters,
 ): boolean {
-  if (profile.blocked || profile.alreadySwiped || profile.inactive) return false;
-  if (profile.age < filters.minAge || profile.age > filters.maxAge) return false;
+  if (profile.blocked || profile.alreadySwiped || profile.inactive)
+    return false;
+  if (profile.age < filters.minAge || profile.age > filters.maxAge)
+    return false;
   if (profile.distanceKm > filters.maxDistanceKm) return false;
   if (filters.genders.length && !filters.genders.includes(profile.gender)) {
     return false;
   }
   if (
     filters.lookingFor.length &&
-    !filters.lookingFor.some((want) => lookingForCompatible(want, profile.lookingFor))
+    !filters.lookingFor.some((want) =>
+      lookingForCompatible(want, profile.lookingFor),
+    )
   ) {
     return false;
   }

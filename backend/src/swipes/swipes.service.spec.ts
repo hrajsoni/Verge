@@ -40,7 +40,9 @@ describe('SwipesService', () => {
 
   describe('recordLike', () => {
     it('should throw BadRequestException if liking self', async () => {
-      await expect(service.recordLike('user1', 'user1')).rejects.toThrow(BadRequestException);
+      await expect(service.recordLike('user1', 'user1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should return matched: false if not mutual', async () => {
@@ -53,17 +55,27 @@ describe('SwipesService', () => {
 
     it('should create match and conversation if mutual like', async () => {
       jest.spyOn(prisma.like, 'upsert').mockResolvedValue(null as any);
-      jest.spyOn(prisma.like, 'findUnique').mockResolvedValue({ id: 'like-id' } as any);
-      jest.spyOn(prisma, '$transaction').mockResolvedValue({ matchId: 'match-id', conversationId: 'conv-id' });
+      jest
+        .spyOn(prisma.like, 'findUnique')
+        .mockResolvedValue({ id: 'like-id' } as any);
+      jest
+        .spyOn(prisma, '$transaction')
+        .mockResolvedValue({ matchId: 'match-id', conversationId: 'conv-id' });
 
       const result = await service.recordLike('user1', 'user2');
-      expect(result).toEqual({ matched: true, matchId: 'match-id', conversationId: 'conv-id' });
+      expect(result).toEqual({
+        matched: true,
+        matchId: 'match-id',
+        conversationId: 'conv-id',
+      });
     });
   });
 
   describe('recordPass', () => {
     it('should throw BadRequestException if passing self', async () => {
-      await expect(service.recordPass('user1', 'user1')).rejects.toThrow(BadRequestException);
+      await expect(service.recordPass('user1', 'user1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should create pass record', async () => {

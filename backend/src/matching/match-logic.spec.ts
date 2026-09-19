@@ -7,9 +7,9 @@ describe('matching', () => {
   });
 
   it('detects mutual likes', () => {
-    expect(
-      isMutualLike([{ fromUserId: 'b', toUserId: 'a' }], 'a', 'b'),
-    ).toBe(true);
+    expect(isMutualLike([{ fromUserId: 'b', toUserId: 'a' }], 'a', 'b')).toBe(
+      true,
+    );
     expect(isMutualLike([], 'a', 'b')).toBe(false);
   });
 });

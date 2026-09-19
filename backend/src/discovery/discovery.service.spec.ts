@@ -52,14 +52,22 @@ describe('DiscoveryService', () => {
     });
 
     it('should throw NotFoundException if user location missing', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({ preferences: {} } as any);
+      jest
+        .spyOn(prisma.user, 'findUnique')
+        .mockResolvedValue({ preferences: {} } as any);
       await expect(service.getFeed('user1')).rejects.toThrow(NotFoundException);
     });
 
     it('should return empty array if no candidates', async () => {
       jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
         id: 'user1',
-        preferences: { minAge: 18, maxAge: 99, maxDistanceKm: 100, genders: [], lookingFor: [] },
+        preferences: {
+          minAge: 18,
+          maxAge: 99,
+          maxDistanceKm: 100,
+          genders: [],
+          lookingFor: [],
+        },
         location: { latitude: 0, longitude: 0 },
         interests: [],
         blocksSent: [],
