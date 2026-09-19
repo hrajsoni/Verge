@@ -136,7 +136,7 @@ class OnboardingViewModel @Inject constructor(
                 nextStep()
             } catch (e: Exception) {
                 Timber.e(e, "Login failed")
-                _error.value = "Login failed: \${e.message}"
+                _error.value = "Login failed: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

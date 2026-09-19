@@ -12,7 +12,11 @@ describe('ChatService', () => {
     conversationMember: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn(),
+    },
+    block: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     message: {
       findMany: jest.fn(),
@@ -71,12 +75,12 @@ describe('ChatService', () => {
       const dto = { type: MessageType.SNAP, text: '' };
       const mockMember = { conversationId: 'conv-1', userId: 'user-1' };
       mockPrisma.conversationMember.findUnique.mockResolvedValue(mockMember);
-      mockPrisma.message.create.mockResolvedValue({ id: 'msg-1', snapViewState: SnapViewState.SENT, ...dto });
+      mockPrisma.message.create.mockResolvedValue({ id: 'msg-1', snapViewState: SnapViewState.CREATED, ...dto });
 
       await service.sendMessage('user-1', 'conv-1', dto);
       expect(mockPrisma.message.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({
-          snapViewState: SnapViewState.SENT,
+          snapViewState: SnapViewState.CREATED,
         }),
       }));
     });

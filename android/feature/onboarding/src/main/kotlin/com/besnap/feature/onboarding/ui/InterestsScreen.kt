@@ -64,7 +64,7 @@ fun InterestsScreen(
         Spacer(modifier = Modifier.weight(1f))
         
         Text(
-            text = "\${selectedInterests.size}/3 Selected",
+            text = "${selectedInterests.size}/3 Selected",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 16.dp)
         )

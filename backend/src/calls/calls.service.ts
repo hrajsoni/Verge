@@ -27,6 +27,18 @@ export class CallsService {
       throw new BadRequestException('Cannot initiate a call in an empty conversation');
     }
 
+    const isBlocked = await this.prisma.block.findFirst({
+      where: {
+        OR: [
+          { blockerId: callerId, blockedId: otherMember.userId },
+          { blockerId: otherMember.userId, blockedId: callerId },
+        ],
+      },
+    });
+    if (isBlocked) {
+      throw new ForbiddenException('Cannot call a blocked user');
+    }
+
     const activeCall = await this.getActiveCall(dto.conversationId);
     if (activeCall) {
       throw new BadRequestException('An active call already exists in this conversation');
@@ -134,5 +146,14 @@ export class CallsService {
       },
       include: { participants: true },
     });
+  }
+
+  async checkCallParticipant(userId: string, callId: string): Promise<boolean> {
+    const call = await this.prisma.call.findUnique({
+      where: { id: callId },
+      include: { participants: true },
+    });
+    if (!call) return false;
+    return call.participants.some((p) => p.userId === userId);
   }
 }

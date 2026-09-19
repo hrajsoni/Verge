@@ -9,6 +9,7 @@ datasource db {
 
 enum AccountStatus {
   ACTIVE
+  UNDER_REVIEW
   WARNING
   RESTRICTED
   SUSPENDED
@@ -46,9 +47,12 @@ enum MessageType {
 }
 
 enum SnapViewState {
-  SENT
+  CREATED
   DELIVERED
   OPENED
+  VIEWING
+  REPLAY_AVAILABLE
+  REPLAYED
   EXPIRED
 }
 
@@ -87,6 +91,7 @@ enum ReportCategory {
   HARASSMENT
   FAKE_ACCOUNT
   NUDITY
+  SEXUAL_CONTENT
   THREATENING
   SCAM
   UNDERAGE
@@ -116,34 +121,40 @@ model User {
   phone          String?       @unique
   googleSub      String?       @unique
   passwordHash   String?
-  dateOfBirth    DateTime
+  dateOfBirth    DateTime?
   status         AccountStatus @default(ACTIVE)
+  bannedAt       DateTime?
+  banReason      String?
   lastActiveAt   DateTime      @default(now())
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   onboardingDone Boolean       @default(false)
 
-  profile       Profile?
-  preferences   DiscoveryPreference?
-  location      UserLocation?
-  interests     UserInterest[]
-  photos        ProfilePhoto[]
-  likesSent     Like[]               @relation("LikesSent")
-  likesReceived Like[]               @relation("LikesReceived")
-  passesSent    Pass[]               @relation("PassesSent")
-  matchesA      Match[]              @relation("MatchesA")
-  matchesB      Match[]              @relation("MatchesB")
-  memberships   ConversationMember[]
-  messages      Message[]
-  media         MediaAsset[]
-  calls         CallParticipant[]
-  blocksSent    Block[]              @relation("BlocksSent")
-  blocksReceived Block[]             @relation("BlocksReceived")
-  reportsSent   Report[]             @relation("ReportsSent")
-  reportsAbout  Report[]             @relation("ReportsAbout")
-  devices       DeviceToken[]
-  notifications Notification[]
-  moderation    ModerationAction[]   @relation("ModerationTarget")
+  profile        Profile?
+  preferences    DiscoveryPreference?
+  location       UserLocation?
+  interests      UserInterest[]
+  photos         ProfilePhoto[]
+  likesSent      Like[]               @relation("LikesSent")
+  likesReceived  Like[]               @relation("LikesReceived")
+  passesSent     Pass[]               @relation("PassesSent")
+  matchesA       Match[]              @relation("MatchesA")
+  matchesB       Match[]              @relation("MatchesB")
+  memberships    ConversationMember[]
+  messages       Message[]
+  media          MediaAsset[]
+  calls          CallParticipant[]
+  blocksSent     Block[]              @relation("BlocksSent")
+  blocksReceived Block[]              @relation("BlocksReceived")
+  reportsSent    Report[]             @relation("ReportsSent")
+  reportsAbout   Report[]             @relation("ReportsAbout")
+  devices        DeviceToken[]
+  notifications  Notification[]
+  moderation     ModerationAction[]   @relation("ModerationTarget")
+  loginEvents    UserLoginEvent[]
+
+  @@index([status])
+  @@index([lastActiveAt])
 }
 
 model Profile {
@@ -196,6 +207,8 @@ model UserLocation {
   longitude Float
   geohash   String
   updatedAt DateTime @updatedAt
+
+  @@index([geohash])
 }
 
 model ProfilePhoto {
@@ -206,6 +219,8 @@ model ProfilePhoto {
   media     MediaAsset @relation(fields: [mediaId], references: [id])
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Like {
@@ -264,21 +279,27 @@ model ConversationMember {
   muted          Boolean      @default(false)
 
   @@id([conversationId, userId])
+  @@index([userId])
 }
 
 model Message {
-  id             String        @id @default(uuid())
-  conversationId String
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderId       String
-  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  type           MessageType
-  text           String?
-  mediaId        String?
-  media          MediaAsset?   @relation(fields: [mediaId], references: [id])
-  snapExpiresAt  DateTime?
-  snapViewState  SnapViewState?
-  createdAt      DateTime      @default(now())
+  id               String        @id @default(uuid())
+  conversationId   String
+  conversation     Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId         String
+  sender           User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  type             MessageType
+  text             String?
+  mediaId          String?
+  media            MediaAsset?   @relation(fields: [mediaId], references: [id])
+  snapExpiresAt    DateTime?
+  snapViewState    SnapViewState?
+  snapViewDuration Int?
+  snapMaxViews     Int?          @default(1)
+  snapViewCount    Int?          @default(0)
+  snapOpenedAt     DateTime?
+  snapReplayUsedAt DateTime?
+  createdAt        DateTime      @default(now())
 
   @@index([conversationId, createdAt])
 }
@@ -294,9 +315,13 @@ model MediaAsset {
   sizeBytes        Int
   durationMs       Int?
   moderationStatus ModerationStatus @default(PENDING)
+  expiresAt        DateTime?
+  deletedAt        DateTime?
   createdAt        DateTime         @default(now())
   messages         Message[]
   photos           ProfilePhoto[]
+
+  @@index([ownerId])
 }
 
 model Call {
@@ -310,6 +335,8 @@ model Call {
   endedAt        DateTime?
   participants   CallParticipant[]
   events         CallEvent[]
+
+  @@index([conversationId])
 }
 
 model CallParticipant {
@@ -321,6 +348,7 @@ model CallParticipant {
   role    String
 
   @@unique([callId, userId])
+  @@index([userId])
 }
 
 model CallEvent {
@@ -341,18 +369,26 @@ model Block {
   createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
+  @@index([blockedId])
 }
 
 model Report {
-  id         String         @id @default(uuid())
-  reporterId String
-  targetId   String
-  reporter   User           @relation("ReportsSent", fields: [reporterId], references: [id], onDelete: Cascade)
-  target     User           @relation("ReportsAbout", fields: [targetId], references: [id], onDelete: Cascade)
-  category   ReportCategory
-  details    String         @default("")
-  status     ReportStatus   @default(NEW)
-  createdAt  DateTime       @default(now())
+  id             String         @id @default(uuid())
+  reporterId     String
+  targetId       String
+  reporter       User           @relation("ReportsSent", fields: [reporterId], references: [id], onDelete: Cascade)
+  target         User           @relation("ReportsAbout", fields: [targetId], references: [id], onDelete: Cascade)
+  category       ReportCategory
+  details        String         @default("")
+  messageId      String?
+  mediaId        String?
+  conversationId String?
+  status         ReportStatus   @default(NEW)
+  createdAt      DateTime       @default(now())
+
+  @@unique([reporterId, targetId])
+  @@index([targetId])
+  @@index([status])
 }
 
 model ModerationAction {
@@ -383,6 +419,20 @@ model Notification {
   body      String
   readAt    DateTime?
   createdAt DateTime             @default(now())
+
+  @@index([userId, readAt])
+}
+
+model UserLoginEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([ipAddress])
 }
 
 model LensCatalog {

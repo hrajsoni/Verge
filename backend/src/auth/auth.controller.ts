@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto, RequestOtpDto, VerifyOtpDto } from './dto';
 
@@ -24,5 +24,15 @@ export class AuthController {
   @Post('otp/verify')
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.auth.verifyOtp(dto);
+  }
+
+  @Post('google')
+  googleLogin(
+    @Body() dto: import('./dto').GoogleAuthDto,
+    @Req() req: any,
+  ) {
+    const ip = req.ip || req.headers?.['x-forwarded-for']?.toString() || '127.0.0.1';
+    const userAgent = req.headers?.['user-agent'];
+    return this.auth.googleLogin(dto, ip, userAgent);
   }
 }

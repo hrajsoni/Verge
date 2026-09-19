@@ -21,6 +21,9 @@ describe('SwipesService', () => {
             pass: {
               upsert: jest.fn(),
             },
+            block: {
+              findFirst: jest.fn().mockResolvedValue(null),
+            },
             $transaction: jest.fn(),
           },
         },

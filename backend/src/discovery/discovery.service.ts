@@ -55,6 +55,7 @@ export class DiscoveryService {
       where: {
         id: { not: userId },
         status: 'ACTIVE',
+        dateOfBirth: { not: null },
         profile: { isNot: null },
         location: { isNot: null },
       },
@@ -76,7 +77,7 @@ export class DiscoveryService {
         candidate.location!.latitude,
         candidate.location!.longitude,
       );
-      const age = yearsSince(candidate.dateOfBirth);
+      const age = candidate.dateOfBirth ? yearsSince(candidate.dateOfBirth) : 20;
       const sharedInterestCount = candidate.interests.filter((i) =>
         userInterestIds.has(i.interestId),
       ).length;

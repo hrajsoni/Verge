@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsDateString, IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -38,4 +38,10 @@ export class VerifyOtpDto {
   @IsOptional()
   @IsString()
   displayName?: string;
+}
+
+export class GoogleAuthDto {
+  @IsString()
+  @IsNotEmpty()
+  idToken: string;
 }

@@ -44,7 +44,7 @@ fun DiscoveryPrefsScreen(
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        Text("Age Range: \${localMinAge.toInt()} - \${localMaxAge.toInt()}", style = MaterialTheme.typography.titleMedium)
+        Text("Age Range: ${localMinAge.toInt()} - ${localMaxAge.toInt()}", style = MaterialTheme.typography.titleMedium)
         RangeSlider(
             value = localMinAge..localMaxAge,
             onValueChange = { range ->
@@ -58,7 +58,7 @@ fun DiscoveryPrefsScreen(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Text("Maximum Distance: \${localDistance.toInt()} km", style = MaterialTheme.typography.titleMedium)
+        Text("Maximum Distance: ${localDistance.toInt()} km", style = MaterialTheme.typography.titleMedium)
         Slider(
             value = localDistance,
             onValueChange = {
@@ -72,7 +72,7 @@ fun DiscoveryPrefsScreen(
         Spacer(modifier = Modifier.height(24.dp))
         
         Text("Interested In", style = MaterialTheme.typography.titleMedium)
-        Gender.values().forEach { gender ->
+        Gender.entries.forEach { gender ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()

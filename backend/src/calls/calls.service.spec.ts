@@ -18,6 +18,9 @@ describe('CallsService', () => {
       update: jest.fn(),
       findFirst: jest.fn(),
     },
+    block: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   };
 
   beforeEach(async () => {

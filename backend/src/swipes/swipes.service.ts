@@ -14,6 +14,19 @@ export class SwipesService {
       throw new BadRequestException('Cannot like yourself');
     }
 
+    // Check if either user blocked the other
+    const isBlocked = await this.prisma.block.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: targetUserId },
+          { blockerId: targetUserId, blockedId: userId },
+        ],
+      },
+    });
+    if (isBlocked) {
+      throw new BadRequestException('Cannot interact with this user');
+    }
+
     // Upsert to handle repeated likes safely
     await this.prisma.like.upsert({
       where: {
@@ -42,7 +55,7 @@ export class SwipesService {
     if (mutualLike) {
       const [userAId, userBId] = this.pairKey(userId, targetUserId);
 
-      // Create Match and Conversation in transaction
+      // Create Match and Conversation in transaction safely
       const result = await this.prisma.$transaction(async (tx) => {
         const match = await tx.match.upsert({
           where: {
@@ -55,8 +68,12 @@ export class SwipesService {
           },
         });
 
-        const conversation = await tx.conversation.create({
-          data: {
+        const conversation = await tx.conversation.upsert({
+          where: {
+            matchId: match.id,
+          },
+          update: {},
+          create: {
             matchId: match.id,
             members: {
               create: [

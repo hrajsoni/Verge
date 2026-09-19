@@ -16,7 +16,8 @@
         android:label="Be-Snap"
         android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
-        android:theme="@style/Theme.BeSnap">
+        android:theme="@style/Theme.BeSnap"
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
             android:name=".MainActivity"

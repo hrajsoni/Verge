@@ -112,6 +112,28 @@ export class ChatService {
   async sendMessage(userId: string, conversationId: string, dto: SendMessageDto) {
     await this.checkMembership(userId, conversationId);
 
+    const otherMember = await this.prisma.conversationMember.findFirst({
+      where: {
+        conversationId,
+        userId: { not: userId },
+      },
+    });
+
+    if (otherMember) {
+      const isBlocked = await this.prisma.block.findFirst({
+        where: {
+          OR: [
+            { blockerId: userId, blockedId: otherMember.userId },
+            { blockerId: otherMember.userId, blockedId: userId },
+          ],
+        },
+      });
+
+      if (isBlocked) {
+        throw new ForbiddenException('Cannot send message to a blocked user');
+      }
+    }
+
     const messageData: any = {
       conversationId,
       senderId: userId,
@@ -121,7 +143,7 @@ export class ChatService {
     };
 
     if (dto.type === MessageType.SNAP) {
-      messageData.snapViewState = SnapViewState.SENT;
+      messageData.snapViewState = SnapViewState.CREATED;
     }
 
     const message = await this.prisma.message.create({
