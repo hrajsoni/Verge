@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CompleteOnboardingDto } from './onboarding.dto';
-import { yearsSince } from '../common/geo';
+import { yearsSince, encodeGeohash } from '../common/geo';
 
 @Injectable()
 export class OnboardingService {
@@ -42,14 +42,14 @@ export class OnboardingService {
       });
 
       // 3. Upsert preferences
-      await tx.userPreferences.upsert({
+      await tx.discoveryPreference.upsert({
         where: { userId },
         update: {
           minAge: dto.minAge,
           maxAge: dto.maxAge,
           maxDistanceKm: dto.maxDistanceKm,
           genders: dto.genders as any[],
-          lookingFor: dto.lookingFor as any,
+          lookingFor: [dto.lookingFor as any], // assuming array since enum says LookingFor[]
         },
         create: {
           userId,
@@ -57,7 +57,7 @@ export class OnboardingService {
           maxAge: dto.maxAge,
           maxDistanceKm: dto.maxDistanceKm,
           genders: dto.genders as any[],
-          lookingFor: dto.lookingFor as any,
+          lookingFor: [dto.lookingFor as any],
         },
       });
 
@@ -76,12 +76,14 @@ export class OnboardingService {
         update: {
           latitude: dto.latitude,
           longitude: dto.longitude,
+          geohash: encodeGeohash(dto.latitude, dto.longitude),
           updatedAt: new Date(),
         },
         create: {
           userId,
           latitude: dto.latitude,
           longitude: dto.longitude,
+          geohash: encodeGeohash(dto.latitude, dto.longitude),
         },
       });
     });
