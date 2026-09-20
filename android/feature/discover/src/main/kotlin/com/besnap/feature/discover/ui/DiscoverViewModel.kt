@@ -13,20 +13,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class DiscoverUiState(
-    val cards: List<DiscoverCard> = emptyList(),
-    val currentIndex: Int = 0,
-    val isLoading: Boolean = true,
-    val error: String? = null,
-    val matchEvent: String? = null
-)
+sealed interface DiscoverUiState {
+    data object Loading : DiscoverUiState
+    data class Success(
+        val cards: List<DiscoverCard>,
+        val currentIndex: Int = 0,
+        val matchEvent: String? = null
+    ) : DiscoverUiState
+    data class Error(val message: String) : DiscoverUiState
+    data object Empty : DiscoverUiState
+}
 
 @HiltViewModel
 class DiscoverViewModel @Inject constructor(
     private val repository: DiscoverRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DiscoverUiState())
+    private val _uiState = MutableStateFlow<DiscoverUiState>(DiscoverUiState.Loading)
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
     init {
@@ -34,17 +37,21 @@ class DiscoverViewModel @Inject constructor(
     }
 
     fun refresh() {
-        _uiState.update { it.copy(isLoading = true, error = null, currentIndex = 0) }
+        _uiState.value = DiscoverUiState.Loading
         viewModelScope.launch {
             when (val result = repository.getFeed()) {
                 is BeSnapResult.Success -> {
-                    _uiState.update { it.copy(cards = result.data, isLoading = false) }
+                    if (result.data.isEmpty()) {
+                        _uiState.value = DiscoverUiState.Empty
+                    } else {
+                        _uiState.value = DiscoverUiState.Success(cards = result.data)
+                    }
                 }
                 is BeSnapResult.Error -> {
-                    _uiState.update { it.copy(error = result.message, isLoading = false) }
+                    _uiState.value = DiscoverUiState.Error(result.message)
                 }
                 is BeSnapResult.Loading -> {
-                    // Do nothing here, we already set isLoading = true
+                    // Do nothing here, we already set Loading
                 }
             }
         }
@@ -64,7 +71,13 @@ class DiscoverViewModel @Inject constructor(
         viewModelScope.launch {
             val result = repository.likeUser(currentCard.userId)
             if (result is BeSnapResult.Success && result.data.matched) {
-                _uiState.update { it.copy(matchEvent = "You matched with ${currentCard.displayName}!") }
+                _uiState.update { currentState ->
+                    if (currentState is DiscoverUiState.Success) {
+                        currentState.copy(matchEvent = "You matched with ${currentCard.displayName}!")
+                    } else {
+                        currentState
+                    }
+                }
             }
         }
     }
@@ -78,12 +91,18 @@ class DiscoverViewModel @Inject constructor(
     }
 
     fun consumeMatchEvent() {
-        _uiState.update { it.copy(matchEvent = null) }
+        _uiState.update { currentState ->
+            if (currentState is DiscoverUiState.Success) {
+                currentState.copy(matchEvent = null)
+            } else {
+                currentState
+            }
+        }
     }
 
     private fun getCurrentCard(): DiscoverCard? {
         val state = _uiState.value
-        return if (state.currentIndex < state.cards.size) {
+        return if (state is DiscoverUiState.Success && state.currentIndex < state.cards.size) {
             state.cards[state.currentIndex]
         } else {
             null
@@ -91,6 +110,16 @@ class DiscoverViewModel @Inject constructor(
     }
 
     private fun advanceToNextCard() {
-        _uiState.update { it.copy(currentIndex = it.currentIndex + 1) }
+        _uiState.update { currentState ->
+            if (currentState is DiscoverUiState.Success) {
+                if (currentState.currentIndex + 1 >= currentState.cards.size) {
+                    DiscoverUiState.Empty
+                } else {
+                    currentState.copy(currentIndex = currentState.currentIndex + 1)
+                }
+            } else {
+                currentState
+            }
+        }
     }
 }

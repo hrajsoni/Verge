@@ -20,5 +20,7 @@ data class OnboardingData(
     val minAge: Int = 18,
     val maxAge: Int = 50,
     val maxDistanceKm: Int = 50,
-    val interestedInGenders: Set<Gender> = emptySet()
+    val interestedInGenders: Set<Gender> = emptySet(),
+    val bio: String = "",
+    val gender: Gender? = null
 )

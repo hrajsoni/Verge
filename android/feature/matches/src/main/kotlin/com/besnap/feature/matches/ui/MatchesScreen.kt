@@ -17,9 +17,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.besnap.core.design.components.BeSnapEmptyState
+import com.besnap.core.design.components.BeSnapErrorState
+import com.besnap.core.design.components.BeSnapLoadingIndicator
+import com.besnap.core.network.model.MatchDto
 import com.besnap.feature.matches.MatchesUiState
 import com.besnap.feature.matches.MatchesViewModel
-import com.besnap.feature.matches.model.MatchItem
 
 @Composable
 fun MatchesRoute(
@@ -31,6 +34,7 @@ fun MatchesRoute(
     MatchesScreen(
         uiState = uiState,
         onNavigateToChat = onNavigateToChat,
+        onRetry = viewModel::loadMatches,
         modifier = modifier
     )
 }
@@ -40,6 +44,7 @@ fun MatchesRoute(
 fun MatchesScreen(
     uiState: MatchesUiState,
     onNavigateToChat: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -50,54 +55,51 @@ fun MatchesScreen(
         },
         modifier = modifier
     ) { padding ->
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                if (uiState.newMatches.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "💜 New Matches",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(uiState.newMatches, key = { it.matchId }) { match ->
-                                NewMatchItem(match = match, onClick = {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            when (uiState) {
+                is MatchesUiState.Loading -> {
+                    BeSnapLoadingIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+                is MatchesUiState.Empty -> {
+                    BeSnapEmptyState(
+                        title = "No matches yet",
+                        subtitle = "Keep swiping to find people nearby",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                is MatchesUiState.Error -> {
+                    BeSnapErrorState(
+                        message = uiState.message,
+                        onRetry = onRetry,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                is MatchesUiState.Success -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        item {
+                            Text(
+                                text = "Your Matches",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+
+                        items(uiState.matches, key = { it.id }) { match ->
+                            ConnectionItem(
+                                match = match,
+                                onClick = {
                                     match.conversationId?.let { onNavigateToChat(it) }
-                                })
-                            }
+                                }
+                            )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
-                }
-
-                item {
-                    Text(
-                        text = "Your Connections",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-
-                items(uiState.connections, key = { it.matchId }) { connection ->
-                    ConnectionItem(
-                        match = connection,
-                        onClick = {
-                            connection.conversationId?.let { onNavigateToChat(it) }
-                        }
-                    )
                 }
             }
         }
@@ -105,34 +107,8 @@ fun MatchesScreen(
 }
 
 @Composable
-fun NewMatchItem(
-    match: MatchItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.clickable(onClick = onClick)
-    ) {
-        AsyncImage(
-            model = match.photoUrl,
-            contentDescription = "Avatar of ${match.displayName}",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = match.displayName,
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
-}
-
-@Composable
 fun ConnectionItem(
-    match: MatchItem,
+    match: MatchDto,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -144,7 +120,7 @@ fun ConnectionItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = match.photoUrl,
+            model = match.avatarUrl,
             contentDescription = "Avatar of ${match.displayName}",
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -156,25 +132,16 @@ fun ConnectionItem(
             Text(
                 text = match.displayName,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (match.unreadCount > 0) FontWeight.Bold else FontWeight.Normal
+                fontWeight = FontWeight.Normal
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = match.lastMessage ?: "",
+                text = "Matched on ${match.matchedAt.take(10)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = if (match.unreadCount > 0) FontWeight.Bold else FontWeight.Normal
+                overflow = TextOverflow.Ellipsis
             )
-        }
-        if (match.unreadCount > 0) {
-            Badge(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Text(match.unreadCount.toString())
-            }
         }
     }
 }

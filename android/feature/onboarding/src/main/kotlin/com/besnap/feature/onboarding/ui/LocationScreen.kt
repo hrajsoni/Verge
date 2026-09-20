@@ -11,7 +11,7 @@ import com.besnap.core.design.components.BeSnapButton
 
 @Composable
 fun LocationScreen(
-    onAllowLocation: () -> Unit,
+    onAllowLocation: (Double, Double) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -51,7 +51,7 @@ fun LocationScreen(
         
         BeSnapButton(
             text = "Allow Location",
-            onClick = onAllowLocation,
+            onClick = { onAllowLocation(0.0, 0.0) }, // dummy coordinates for now
             modifier = Modifier.fillMaxWidth()
         )
         

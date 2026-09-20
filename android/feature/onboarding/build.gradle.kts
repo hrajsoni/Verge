@@ -9,13 +9,19 @@ plugins {
 android {
     namespace = "com.besnap.feature.onboarding"
     compileSdk = 35
-    defaultConfig { minSdk = 26 }
+    defaultConfig { 
+        minSdk = 26
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"placeholder_client_id\"")
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { 
+        compose = true 
+        buildConfig = true
+    }
 }
 
 dependencies {
@@ -35,4 +41,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.timber)
+
+    // Google Credential Manager + Sign in with Google
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 }

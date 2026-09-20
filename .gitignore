@@ -25,6 +25,8 @@ npm-debug.log*
 
 # Android
 android/.gradle/
+android/.kotlin/
+.kotlin/
 android/**/build/
 android/**/.cxx/
 android/captures/

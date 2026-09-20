@@ -14,8 +14,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.besnap.core.design.theme.LikeGreen
-import com.besnap.core.design.theme.PassRed
 
 @Composable
 fun DiscoverRoute(
@@ -45,25 +43,25 @@ fun DiscoverScreen(
     onMatchEventConsumed: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            uiState.isLoading -> {
+        when (uiState) {
+            is DiscoverUiState.Loading -> {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
-            uiState.error != null -> {
+            is DiscoverUiState.Error -> {
                 Column(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(text = uiState.error, color = MaterialTheme.colorScheme.error)
+                    Text(text = uiState.message, color = MaterialTheme.colorScheme.error)
                     Button(onClick = onRefresh) {
                         Text("Retry")
                     }
                 }
             }
-            uiState.currentIndex >= uiState.cards.size -> {
+            is DiscoverUiState.Empty -> {
                 Column(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -81,100 +79,75 @@ fun DiscoverScreen(
                     }
                 }
             }
-            else -> {
-                val currentCard = uiState.cards[uiState.currentIndex]
+            is DiscoverUiState.Success -> {
+                val currentCard = uiState.cards.getOrNull(uiState.currentIndex)
                 
-                // Show next card behind
-                if (uiState.currentIndex + 1 < uiState.cards.size) {
-                    val nextCard = uiState.cards[uiState.currentIndex + 1]
-                    ProfileCard(
-                        card = nextCard,
-                        onPassClick = {},
-                        onLikeClick = {},
+                if (currentCard == null) {
+                    // Should be handled by Empty state, but fallback just in case
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                    )
-                }
+                            .align(Alignment.Center)
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "No more people nearby! Expand your distance or check back later.",
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Button(onClick = onRefresh) {
+                            Text("Refresh")
+                        }
+                    }
+                } else {
+                    // Show next card behind
+                    if (uiState.currentIndex + 1 < uiState.cards.size) {
+                        val nextCard = uiState.cards[uiState.currentIndex + 1]
+                        ProfileCard(
+                            card = nextCard,
+                            onPassClick = {},
+                            onLikeClick = {},
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        )
+                    }
 
-                // Current card
-                key(currentCard.userId) {
-                    SwipeableCard(
-                        onSwipedLeft = onSwipeLeft,
-                        onSwipedRight = onSwipeRight,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                    ) { dragOffset ->
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            ProfileCard(
-                                card = currentCard,
-                                onPassClick = onPassClicked,
-                                onLikeClick = onLikeClicked
-                            )
-
-                            // Stamp Overlays
-                            if (dragOffset > 50f) {
-                                StampOverlay(
-                                    text = "LIKE",
-                                    color = LikeGreen,
-                                    modifier = Modifier
-                                        .align(Alignment.TopStart)
-                                        .padding(start = 32.dp, top = 64.dp)
-                                        .alpha((dragOffset / 300f).coerceIn(0f, 1f))
+                    // Current card
+                    key(currentCard.userId) {
+                        SwipeableCard(
+                            onSwipedLeft = onSwipeLeft,
+                            onSwipedRight = onSwipeRight,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                ProfileCard(
+                                    card = currentCard,
+                                    onPassClick = onPassClicked,
+                                    onLikeClick = onLikeClicked
                                 )
-                            } else if (dragOffset < -50f) {
-                                StampOverlay(
-                                    text = "PASS",
-                                    color = PassRed,
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(end = 32.dp, top = 64.dp)
-                                        .alpha((-dragOffset / 300f).coerceIn(0f, 1f))
-                                )
+                                // Removed Stamp Overlays since dragOffset is no longer available
                             }
                         }
+                    }
+
+                    uiState.matchEvent?.let { message ->
+                        AlertDialog(
+                            onDismissRequest = onMatchEventConsumed,
+                            title = { Text("It's a Match!") },
+                            text = { Text(message) },
+                            confirmButton = {
+                                Button(onClick = onMatchEventConsumed) {
+                                    Text("Awesome")
+                                }
+                            }
+                        )
                     }
                 }
             }
         }
-
-        uiState.matchEvent?.let { message ->
-            AlertDialog(
-                onDismissRequest = onMatchEventConsumed,
-                title = { Text("It's a Match!") },
-                text = { Text(message) },
-                confirmButton = {
-                    Button(onClick = onMatchEventConsumed) {
-                        Text("Awesome")
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun StampOverlay(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .border(
-                width = 4.dp,
-                color = color,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = text,
-            color = color,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 4.sp
-        )
     }
 }

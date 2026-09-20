@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,8 +51,9 @@ fun ChatBubble(
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
+                val formatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
                 Text(
-                    text = message.timestamp.format(DateTimeFormatter.ofPattern("HH:mm")),
+                    text = message.timestamp.format(formatter),
                     color = textColor.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.End)

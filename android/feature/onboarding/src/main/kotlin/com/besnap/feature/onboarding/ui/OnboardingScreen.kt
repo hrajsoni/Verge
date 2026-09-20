@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.besnap.feature.onboarding.OnboardingViewModel
 import com.besnap.feature.onboarding.model.OnboardingStep
@@ -20,6 +21,7 @@ fun OnboardingScreen(
     val onboardingData by viewModel.onboardingData.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(currentStep) {
         if (currentStep == OnboardingStep.COMPLETE) {
@@ -33,11 +35,10 @@ fun OnboardingScreen(
                 onGetStarted = viewModel::nextStep
             )
             OnboardingStep.AUTH -> AuthScreen(
-                onLogin = viewModel::login,
-                onRegister = viewModel::register,
+                onSignInWithGoogle = { viewModel.signInWithGoogle(context) },
                 isLoading = isLoading,
                 error = error,
-                onBack = viewModel::previousStep
+                onBack = viewModel::previousStep,
             )
             OnboardingStep.NAME_DOB -> NameDobScreen(
                 displayName = onboardingData.displayName,
@@ -74,7 +75,7 @@ fun OnboardingScreen(
                 onBack = viewModel::previousStep
             )
             OnboardingStep.LOCATION -> LocationScreen(
-                onAllowLocation = viewModel::completeOnboarding,
+                onAllowLocation = { lat, lon -> viewModel.completeOnboarding(lat, lon) },
                 onBack = viewModel::previousStep
             )
             OnboardingStep.COMPLETE -> {

@@ -4,17 +4,20 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
+  ParseIntPipe,
+  DefaultValuePipe,
   ParseUUIDPipe,
-  Delete,
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
+import { SnapService } from './snap.service';
+import { SendMessageDto } from './chat.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUserId } from '../auth/current-user';
-import { SnapService } from './snap.service';
 
-@UseGuards(JwtAuthGuard)
 @Controller('chat')
+@UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(
     private readonly chatService: ChatService,
@@ -23,43 +26,49 @@ export class ChatController {
 
   @Get('conversations')
   async getConversations(@CurrentUserId() userId: string) {
-    return this.chatService.getUserConversations(userId);
-  }
-
-  @Post('conversations')
-  async createConversation(
-    @CurrentUserId() userId: string,
-    @Body('participantIds') participantIds: string[],
-    @Body('isGroup') isGroup?: boolean,
-    @Body('name') name?: string,
-  ) {
-    return this.chatService.createConversation(
-      userId,
-      participantIds,
-      isGroup,
-      name,
-    );
+    return this.chatService.getConversations(userId);
   }
 
   @Get('conversations/:id/messages')
   async getMessages(
     @CurrentUserId() userId: string,
-    @Param('id', ParseUUIDPipe) conversationId: string,
+    @Param('id') conversationId: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('cursor') cursor?: string,
   ) {
-    return this.chatService.getMessages(conversationId, userId);
+    return this.chatService.getMessages(userId, conversationId, limit, cursor);
   }
 
-  @Delete('conversations/:id/messages/:messageId')
-  async deleteMessage(
+  @Post('conversations/:id/messages')
+  async sendMessage(
     @CurrentUserId() userId: string,
-    @Param('id', ParseUUIDPipe) conversationId: string,
-    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Param('id') conversationId: string,
+    @Body() dto: SendMessageDto,
   ) {
-    return this.chatService.deleteMessage(messageId, userId);
+    return this.chatService.sendMessage(userId, conversationId, dto);
+  }
+
+  @Post('conversations/:id/read')
+  async markRead(
+    @CurrentUserId() userId: string,
+    @Param('id') conversationId: string,
+  ) {
+    return this.chatService.markRead(userId, conversationId);
   }
 
   @Post('snaps/:messageId/open')
-  async openSnap(@CurrentUserId() userId: string) {
-    return this.chatService.openSnap(userId, messageId);
+  async openSnap(
+    @CurrentUserId() userId: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ) {
+    return this.snapService.openSnap(messageId, userId);
+  }
+
+  @Post('snaps/:messageId/viewed')
+  async markSnapViewed(
+    @CurrentUserId() userId: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ) {
+    return this.snapService.markSnapViewed(messageId, userId);
   }
 }

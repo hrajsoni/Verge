@@ -35,8 +35,9 @@ export class SnapCleanupService implements OnModuleInit {
       where: {
         snapViewDuration: { not: null }, // only snap messages
         media: {
-          isNot: null,
-          deletedAt: null as any, // not yet deleted
+          is: {
+            deletedAt: null,
+          },
         },
         OR: [
           { snapViewState: SnapViewState.EXPIRED },
