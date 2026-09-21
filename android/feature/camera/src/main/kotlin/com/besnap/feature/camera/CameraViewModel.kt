@@ -8,12 +8,12 @@ import com.besnap.feature.camera.model.CameraState
 import com.besnap.feature.camera.model.CaptureMode
 import com.besnap.feature.camera.model.CapturedMedia
 import com.besnap.feature.camera.model.FlashMode
+import com.snap.camerakit.lenses.LensesComponent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -22,6 +22,40 @@ class CameraViewModel @Inject constructor() : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraState())
     val uiState: StateFlow<CameraState> = _uiState.asStateFlow()
+
+    // Lenses loaded from Camera Kit
+    private val _lenses = MutableStateFlow<List<LensesComponent.Lens>>(emptyList())
+    val lenses: StateFlow<List<LensesComponent.Lens>> = _lenses.asStateFlow()
+
+    private val _activeLensIndex = MutableStateFlow<Int?>(null)
+    val activeLensIndex: StateFlow<Int?> = _activeLensIndex.asStateFlow()
+
+    // Snap settings
+    private val _snapDurationSeconds = MutableStateFlow(5)
+    val snapDurationSeconds: StateFlow<Int> = _snapDurationSeconds.asStateFlow()
+
+    private val _snapReplayAllowed = MutableStateFlow(false)
+    val snapReplayAllowed: StateFlow<Boolean> = _snapReplayAllowed.asStateFlow()
+
+    fun onLensesLoaded(loaded: List<LensesComponent.Lens>) {
+        _lenses.value = loaded
+    }
+
+    fun selectLens(index: Int) {
+        _activeLensIndex.value = index
+    }
+
+    fun clearLens() {
+        _activeLensIndex.value = null
+    }
+
+    fun setSnapDuration(seconds: Int) {
+        _snapDurationSeconds.value = seconds
+    }
+
+    fun toggleReplay() {
+        _snapReplayAllowed.update { !it }
+    }
 
     fun toggleCameraFacing() {
         _uiState.update { state ->
@@ -87,7 +121,6 @@ class CameraViewModel @Inject constructor() : ViewModel() {
     fun onSend(recipientId: String) {
         val media = _uiState.value.capturedMedia
         Timber.d("Sending media ${media?.uri} to $recipientId")
-        // Implementation for sending media
     }
 
     fun setActiveFilterIndex(index: Int) {

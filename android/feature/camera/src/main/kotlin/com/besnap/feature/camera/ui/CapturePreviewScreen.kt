@@ -27,6 +27,8 @@ import com.besnap.feature.camera.model.CapturedMedia
 @Composable
 fun CapturePreviewScreen(
     media: CapturedMedia,
+    snapDurationSeconds: Int = 5,
+    replayAllowed: Boolean = false,
     onRetake: () -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier
@@ -52,12 +54,20 @@ fun CapturePreviewScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .align(Alignment.TopCenter)
+                .align(Alignment.TopCenter),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onRetake) {
                 Icon(Icons.Default.Close, contentDescription = "Retake", tint = Color.White)
             }
             Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "⏱ ${snapDurationSeconds}s · Replay: ${if (replayAllowed) "On" else "Off"}",
+                color = Color.White,
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.5f), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
         }
 
         // Bottom bar
