@@ -1,20 +1,56 @@
 package com.besnap.feature.onboarding.ui
 
+import android.Manifest
+import android.annotation.SuppressLint
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.besnap.core.design.components.BeSnapButton
+import com.besnap.core.design.components.BeSnapLoadingIndicator
+import com.google.android.gms.location.LocationServices
+import timber.log.Timber
 
+@SuppressLint("MissingPermission")
 @Composable
 fun LocationScreen(
     onAllowLocation: (Double, Double) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var isLoadingLocation by remember { mutableStateOf(false) }
+    
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                      permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            isLoadingLocation = true
+            val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+            fusedClient.lastLocation
+                .addOnSuccessListener { location ->
+                    val lat = location?.latitude ?: 0.0
+                    val lon = location?.longitude ?: 0.0
+                    if (location == null) Timber.w("GPS returned null location, using (0.0, 0.0)")
+                    isLoadingLocation = false
+                    onAllowLocation(lat, lon)
+                }
+                .addOnFailureListener { e ->
+                    Timber.e(e, "Failed to get location")
+                    isLoadingLocation = false
+                    onAllowLocation(0.0, 0.0)
+                }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -49,11 +85,22 @@ fun LocationScreen(
         
         Spacer(modifier = Modifier.weight(1f))
         
-        BeSnapButton(
-            text = "Allow Location",
-            onClick = { onAllowLocation(0.0, 0.0) }, // dummy coordinates for now
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (isLoadingLocation) {
+            BeSnapLoadingIndicator(modifier = Modifier.padding(16.dp))
+        } else {
+            BeSnapButton(
+                text = "Allow Location",
+                onClick = { 
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
     }

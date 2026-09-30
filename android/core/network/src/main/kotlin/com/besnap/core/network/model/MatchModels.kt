@@ -49,8 +49,12 @@ data class MessageDto(
 
 @JsonClass(generateAdapter = true)
 data class SendMessageRequest(
+    val content: String = "",
+    val messageType: String = "TEXT",
     val text: String? = null,
     val mediaId: String? = null,
     val snapViewDuration: Int? = null,
     val snapMaxViews: Int? = null,
+    val snapDurationSeconds: Int? = null,
+    val allowReplay: Boolean? = null,
 )

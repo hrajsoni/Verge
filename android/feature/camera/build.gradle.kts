@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.timber)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
     // Snap Camera Kit
     implementation("com.snap.camerakit:camerakit:1.12.0")

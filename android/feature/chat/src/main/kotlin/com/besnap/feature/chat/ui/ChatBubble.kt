@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -20,6 +22,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun ChatBubble(
     message: ChatMessage,
+    onSnapTap: (messageId: String) -> Unit = {},
+    onSnapReplay: (messageId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isMine = message.isMine
@@ -44,7 +48,7 @@ fun ChatBubble(
         ) {
             Column {
                 if (message.type == ChatMessageType.SNAP) {
-                    SnapContent(message, textColor)
+                    SnapContent(message, textColor, onSnapTap, onSnapReplay)
                 } else {
                     message.text?.let {
                         Text(text = it, color = textColor, style = MaterialTheme.typography.bodyLarge)
@@ -64,16 +68,45 @@ fun ChatBubble(
 }
 
 @Composable
-fun SnapContent(message: ChatMessage, textColor: Color) {
+fun SnapContent(
+    message: ChatMessage,
+    textColor: Color,
+    onSnapTap: (String) -> Unit,
+    onSnapReplay: (String) -> Unit
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        val iconTint = if (message.snapViewState == SnapViewState.UNOPENED) Color.Red else textColor
-        Icon(Icons.Default.CameraAlt, contentDescription = "Snap", tint = iconTint)
+        val snapColor = MaterialTheme.colorScheme.tertiary
+        val icon = when (message.snapViewState) {
+            SnapViewState.UNOPENED -> Icons.Default.Mail
+            SnapViewState.OPENED -> Icons.Default.MailOutline
+            else -> Icons.Default.MailOutline
+        }
+        val iconTint = if (message.snapViewState == SnapViewState.UNOPENED) snapColor else textColor.copy(alpha = 0.6f)
+        
+        IconButton(
+            onClick = {
+                if (message.snapViewState == SnapViewState.UNOPENED) {
+                    onSnapTap(message.id)
+                }
+            },
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(icon, contentDescription = "Snap", tint = iconTint)
+        }
+        
         Spacer(modifier = Modifier.width(8.dp))
         val text = when (message.snapViewState) {
             SnapViewState.UNOPENED -> "Tap to view"
-            SnapViewState.OPENED -> "Opened"
-            else -> "Expired"
+            SnapViewState.OPENED -> "Opened" // Should probably handle REPLAY_AVAILABLE
+            else -> "Snap expired"
         }
-        Text(text = text, color = textColor, style = MaterialTheme.typography.bodyLarge)
+        val textStyle = if (message.snapViewState == SnapViewState.UNOPENED) {
+            MaterialTheme.typography.bodyLarge.copy(color = snapColor)
+        } else {
+            MaterialTheme.typography.bodyLarge.copy(color = textColor.copy(alpha = 0.6f))
+        }
+        Text(text = text, style = textStyle)
+        
+        // REPLAY logic isn't fully in SnapViewState but if we had it, we'd show replay button
     }
 }

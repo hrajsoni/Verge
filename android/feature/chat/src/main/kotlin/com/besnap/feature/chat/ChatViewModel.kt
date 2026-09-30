@@ -7,6 +7,8 @@ import com.besnap.feature.chat.data.ChatRepository
 import com.besnap.feature.chat.model.ChatMessage
 import com.besnap.feature.chat.model.ChatMessageType
 import com.besnap.feature.chat.model.SnapViewState
+import com.besnap.feature.chat.data.SnapRepository
+import com.besnap.core.network.model.OpenSnapResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +31,7 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val repository: ChatRepository,
+    private val snapRepository: SnapRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -36,6 +39,10 @@ class ChatViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ChatUiState(conversationId = conversationId))
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val _activeSnaps = MutableStateFlow<Map<String, OpenSnapResponse>>(emptyMap())
+    val activeSnaps: StateFlow<Map<String, OpenSnapResponse>> = _activeSnaps.asStateFlow()
+
 
     init {
         loadMessages()
@@ -84,6 +91,22 @@ class ChatViewModel @Inject constructor(
             }.onFailure {
                 Timber.e(it, "Failed to send message")
             }
+        }
+    }
+
+    fun openSnap(messageId: String) {
+        viewModelScope.launch {
+            snapRepository.openSnap(messageId).onSuccess { response ->
+                _activeSnaps.update { it + (messageId to response) }
+            }
+        }
+    }
+
+    fun markSnapViewed(messageId: String) {
+        viewModelScope.launch {
+            snapRepository.markSnapViewed(messageId)
+            _activeSnaps.update { it - messageId }
+            loadMessages() // Reload messages to reflect the VIEWED state
         }
     }
 

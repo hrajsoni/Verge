@@ -6,6 +6,7 @@ import com.besnap.core.network.model.GoogleAuthRequest
 import com.besnap.core.network.model.UserResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 
 interface BeSnapApi {
@@ -50,4 +51,22 @@ interface BeSnapApi {
 
     @POST("users/me/onboarding")
     suspend fun completeOnboarding(@Body request: com.besnap.core.network.model.CompleteOnboardingRequest): com.besnap.core.network.model.OnboardingResponse
+
+    // Media upload (presigned URL flow)
+    @POST("media/upload")
+    suspend fun requestUploadUrl(@Body request: com.besnap.core.network.model.MediaUploadRequest): com.besnap.core.network.model.MediaUploadResponse
+
+    // Snap lifecycle
+    @POST("snaps/{messageId}/open")
+    suspend fun openSnap(@retrofit2.http.Path("messageId") messageId: String): com.besnap.core.network.model.OpenSnapResponse
+
+    @POST("snaps/{messageId}/viewed")
+    suspend fun markSnapViewed(@retrofit2.http.Path("messageId") messageId: String)
+
+    // Profile
+    @GET("users/me")
+    suspend fun getMyProfile(): com.besnap.core.network.model.ProfileResponse
+
+    @PATCH("users/me")
+    suspend fun updateMyProfile(@Body request: com.besnap.core.network.model.UpdateProfileRequest): com.besnap.core.network.model.ProfileResponse
 }

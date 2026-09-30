@@ -28,5 +28,6 @@ data class CameraState(
     val isRecording: Boolean = false,
     val recordingDurationMs: Long = 0L,
     val activeFilterIndex: Int = 0,
-    val capturedMedia: CapturedMedia? = null
+    val capturedMedia: CapturedMedia? = null,
+    val isUploading: Boolean = false
 )

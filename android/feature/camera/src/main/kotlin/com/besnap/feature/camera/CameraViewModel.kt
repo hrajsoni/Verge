@@ -17,8 +17,19 @@ import kotlinx.coroutines.flow.update
 import timber.log.Timber
 import javax.inject.Inject
 
+import android.content.Context
+import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.launch
+import com.besnap.core.network.BeSnapApi
+import com.besnap.core.network.model.MediaUploadRequest
+import com.besnap.core.network.model.SendMessageRequest
+
 @HiltViewModel
-class CameraViewModel @Inject constructor() : ViewModel() {
+class CameraViewModel @Inject constructor(
+    private val api: BeSnapApi
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraState())
     val uiState: StateFlow<CameraState> = _uiState.asStateFlow()
@@ -121,6 +132,51 @@ class CameraViewModel @Inject constructor() : ViewModel() {
     fun onSend(recipientId: String) {
         val media = _uiState.value.capturedMedia
         Timber.d("Sending media ${media?.uri} to $recipientId")
+    }
+
+    fun uploadAndSendSnap(
+        context: Context,
+        fileUri: Uri,
+        mimeType: String,
+        recipientConversationId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploading = true) }
+            try {
+                // 1. Request presigned upload URL
+                val uploadResp = api.requestUploadUrl(MediaUploadRequest(mimeType = mimeType))
+                // 2. PUT file to S3 presigned URL
+                val fileBytes = context.contentResolver.openInputStream(fileUri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Cannot read file")
+                // Use OkHttp directly for the S3 PUT
+                val okClient = OkHttpClient()
+                val putRequest = okhttp3.Request.Builder()
+                    .url(uploadResp.uploadUrl)
+                    .put(fileBytes.toRequestBody(mimeType.toMediaType()))
+                    .build()
+                val putResponse = okClient.newCall(putRequest).execute()
+                if (!putResponse.isSuccessful) throw IllegalStateException("S3 upload failed: ${putResponse.code}")
+                // 3. Send message with mediaId
+                api.sendMessage(
+                    conversationId = recipientConversationId,
+                    request = SendMessageRequest(
+                        content = "",
+                        messageType = "SNAP",
+                        mediaId = uploadResp.mediaId,
+                        snapDurationSeconds = _snapDurationSeconds.value,
+                        allowReplay = _snapReplayAllowed.value,
+                    )
+                )
+                _uiState.update { it.copy(isUploading = false) }
+                onSuccess()
+            } catch (e: Exception) {
+                Timber.e(e, "Snap upload failed")
+                _uiState.update { it.copy(isUploading = false) }
+                onError(e.message ?: "Upload failed")
+            }
+        }
     }
 
     fun setActiveFilterIndex(index: Int) {

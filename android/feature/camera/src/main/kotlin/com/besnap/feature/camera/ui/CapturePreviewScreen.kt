@@ -21,7 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import com.besnap.feature.camera.model.CapturedMedia
 
 @Composable
@@ -29,10 +31,16 @@ fun CapturePreviewScreen(
     media: CapturedMedia,
     snapDurationSeconds: Int = 5,
     replayAllowed: Boolean = false,
+    conversationId: String? = null,
+    viewModel: com.besnap.feature.camera.CameraViewModel? = null,
     onRetake: () -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val snackbarHostState = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+    val uiState = viewModel?.uiState?.collectAsState()?.value
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         // Preview content
         if (media.mimeType.startsWith("image/")) {
@@ -89,10 +97,38 @@ fun CapturePreviewScreen(
             
             Spacer(modifier = Modifier.weight(1f))
             
-            Button(onClick = onSend) {
+            Button(onClick = {
+                if (viewModel != null) {
+                    viewModel.uploadAndSendSnap(
+                        context = context,
+                        fileUri = media.uri,
+                        mimeType = media.mimeType,
+                        recipientConversationId = conversationId ?: "",
+                        onSuccess = onSend,
+                        onError = { error ->
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(error)
+                            }
+                        }
+                    )
+                } else {
+                    onSend()
+                }
+            }) {
                 Text("Send")
                 Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.padding(start = 8.dp))
             }
         }
+        
+        if (uiState?.isUploading == true) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator(color = Color.Yellow)
+            }
+        }
+        
+        androidx.compose.material3.SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
