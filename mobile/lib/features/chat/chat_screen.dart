@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../core/network/api_client.dart';
+import '../../core/network/socket_service.dart';
 import '../../core/theme/glass_theme.dart';
 import '../../core/widgets/liquid_mesh_background.dart';
 import '../../core/widgets/liquid_snap_viewer.dart';
@@ -35,11 +39,13 @@ class ChatMessage {
 class ChatScreen extends StatefulWidget {
   final String peerName;
   final String peerAvatar;
+  final String conversationId;
 
   const ChatScreen({
     super.key,
     required this.peerName,
     required this.peerAvatar,
+    this.conversationId = "demo_conv_1",
   });
 
   @override
@@ -49,11 +55,17 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final List<ChatMessage> _messages = [];
+  bool _isPeerTyping = false;
+  Timer? _typingDebounce;
+
+  StreamSubscription? _msgSub;
+  StreamSubscription? _typingSub;
+  StreamSubscription? _stopTypingSub;
 
   @override
   void initState() {
     super.initState();
-    // Sample conversation with real Snap lifecycle demonstration
+    // Default messages
     _messages.addAll([
       ChatMessage(
         id: "1",
@@ -79,6 +91,67 @@ class _ChatScreenState extends State<ChatScreen> {
         allowReplay: true,
       ),
     ]);
+
+    // Connect to WebSocket room
+    SocketService().joinConversation(widget.conversationId);
+
+    _msgSub = SocketService().onNewMessage.listen((data) {
+      if (data['conversationId'] == widget.conversationId && data['message'] != null) {
+        final m = data['message'];
+        final isSnap = m['snapViewDuration'] != null || m['isSnap'] == true;
+        if (mounted) {
+          setState(() {
+            _messages.add(
+              ChatMessage(
+                id: m['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                text: m['text'] ?? (isSnap ? '📸 Ephemeral Snap' : ''),
+                isMe: false,
+                timestamp: DateTime.tryParse(m['sentAt'] ?? '') ?? DateTime.now(),
+                isSnap: isSnap,
+                snapMediaUrl: m['media']?['objectKey'] ?? '',
+                snapDurationSeconds: m['snapViewDuration'] ?? 5,
+                snapState: SnapState.unopened,
+                allowReplay: (m['snapMaxViews'] ?? 1) > 1,
+              ),
+            );
+          });
+          HapticFeedback.lightImpact();
+        }
+      }
+    });
+
+    _typingSub = SocketService().onUserTyping.listen((data) {
+      if (data['conversationId'] == widget.conversationId && mounted) {
+        setState(() => _isPeerTyping = true);
+      }
+    });
+
+    _stopTypingSub = SocketService().onUserStopTyping.listen((data) {
+      if (data['conversationId'] == widget.conversationId && mounted) {
+        setState(() => _isPeerTyping = false);
+      }
+    });
+
+    _textController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    SocketService().sendTyping(widget.conversationId);
+    _typingDebounce?.cancel();
+    _typingDebounce = Timer(const Duration(seconds: 2), () {
+      SocketService().sendStopTyping(widget.conversationId);
+    });
+  }
+
+  @override
+  void dispose() {
+    _typingDebounce?.cancel();
+    _msgSub?.cancel();
+    _typingSub?.cancel();
+    _stopTypingSub?.cancel();
+    SocketService().leaveConversation(widget.conversationId);
+    _textController.dispose();
+    super.dispose();
   }
 
   void _sendMessage() {
@@ -86,37 +159,129 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
     HapticFeedback.lightImpact();
 
+    final newMsg = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      text: text,
+      isMe: true,
+      timestamp: DateTime.now(),
+    );
+
     setState(() {
-      _messages.add(
-        ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          text: text,
-          isMe: true,
-          timestamp: DateTime.now(),
-        ),
-      );
+      _messages.add(newMsg);
       _textController.clear();
+    });
+
+    SocketService().sendStopTyping(widget.conversationId);
+
+    ApiClient().sendMessage(
+      conversationId: widget.conversationId,
+      text: text,
+    ).catchError((e) {
+      debugPrint('[Chat] sendMessage fallback: $e');
+      return e;
     });
   }
 
-  void _openSnap(ChatMessage msg) {
+  Future<void> _captureAndSendSnap() async {
+    HapticFeedback.heavyImpact();
+    try {
+      final picker = ImagePicker();
+      final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        final uploadRes = await ApiClient().requestUploadUrl(
+          mimeType: 'image/jpeg',
+          type: 'SNAP',
+          sizeBytes: bytes.length,
+        );
+
+        if (uploadRes.data != null && uploadRes.data['uploadUrl'] != null) {
+          final presignedUrl = uploadRes.data['uploadUrl'] as String;
+          final mediaId = uploadRes.data['mediaId'] as String;
+
+          await ApiClient().uploadFileToS3(
+            presignedUrl: presignedUrl,
+            fileBytes: bytes,
+            mimeType: 'image/jpeg',
+          );
+
+          await ApiClient().sendMessage(
+            conversationId: widget.conversationId,
+            mediaId: mediaId,
+            snapDuration: 5,
+            snapMaxViews: 2,
+          );
+
+          if (mounted) {
+            setState(() {
+              _messages.add(
+                ChatMessage(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  text: "Delivered Snap",
+                  isMe: true,
+                  timestamp: DateTime.now(),
+                  isSnap: true,
+                  snapDurationSeconds: 5,
+                  snapState: SnapState.unopened,
+                  allowReplay: true,
+                ),
+              );
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Chat] Error sending snap: $e');
+    }
+  }
+
+  void _openSnap(ChatMessage msg) async {
     if (msg.snapState == SnapState.expired) return;
     HapticFeedback.mediumImpact();
 
+    String viewUrl = msg.snapMediaUrl ?? "";
+    int duration = msg.snapDurationSeconds;
+    bool canReplay = msg.allowReplay && msg.snapState == SnapState.opened;
+
+    if (msg.id.length > 10) {
+      try {
+        final res = await ApiClient().openSnap(msg.id);
+        if (res.data != null) {
+          viewUrl = res.data['viewUrl'] ?? viewUrl;
+          duration = res.data['durationSeconds'] ?? duration;
+          canReplay = res.data['canReplay'] ?? canReplay;
+        }
+      } catch (e) {
+        debugPrint('[Chat] openSnap API error: $e');
+      }
+    }
+
+    if (!mounted) return;
     LiquidSnapViewer.show(
       context: context,
-      mediaUrl: msg.snapMediaUrl ?? "",
-      durationSeconds: msg.snapDurationSeconds,
+      mediaUrl: viewUrl.isNotEmpty
+          ? viewUrl
+          : "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80",
+      durationSeconds: duration,
       senderName: widget.peerName,
-      canReplay: msg.allowReplay && msg.snapState == SnapState.opened,
-      onFinished: () {
-        setState(() {
-          if (msg.allowReplay && msg.snapState == SnapState.unopened) {
-            msg.snapState = SnapState.opened;
-          } else {
-            msg.snapState = SnapState.expired;
+      canReplay: canReplay,
+      onFinished: () async {
+        if (msg.id.length > 10) {
+          try {
+            await ApiClient().markSnapViewed(msg.id);
+          } catch (e) {
+            debugPrint('[Chat] markSnapViewed error: $e');
           }
-        });
+        }
+        if (mounted) {
+          setState(() {
+            if (msg.allowReplay && msg.snapState == SnapState.unopened) {
+              msg.snapState = SnapState.opened;
+            } else {
+              msg.snapState = SnapState.expired;
+            }
+          });
+        }
       },
     );
   }
@@ -143,9 +308,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     right: 16,
                   ),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.65),
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.65),
                     border: Border(
-                      bottom: BorderSide(color: Colors.white.withOpacity(isDark ? 0.14 : 0.6)),
+                      bottom: BorderSide(color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.6)),
                     ),
                   ),
                   child: Row(
@@ -179,7 +344,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 5),
-                                Text("Active now", style: GlassTheme.caption(isDark: isDark).copyWith(fontSize: 11)),
+                                Text(
+                                  _isPeerTyping ? "Typing..." : "Active now",
+                                  style: GlassTheme.caption(isDark: isDark).copyWith(
+                                    fontSize: 11,
+                                    color: _isPeerTyping ? GlassTheme.snapYellow : null,
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -218,19 +389,22 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.70),
+                        color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.70),
                         borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.22 : 0.8)),
+                        border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.22 : 0.8)),
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: GlassTheme.snapYellow,
-                              shape: BoxShape.circle,
+                          GestureDetector(
+                            onTap: _captureAndSendSnap,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: GlassTheme.snapYellow,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(CupertinoIcons.camera_fill, color: Colors.black, size: 18),
                             ),
-                            child: const Icon(CupertinoIcons.camera_fill, color: Colors.black, size: 18),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -240,7 +414,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               decoration: InputDecoration(
                                 hintText: "Send a chat or snap...",
                                 hintStyle: GlassTheme.body(isDark: isDark).copyWith(
-                                  color: isDark ? Colors.white.withOpacity(0.4) : Colors.black38,
+                                  color: isDark ? Colors.white.withValues(alpha: 0.4) : Colors.black38,
                                 ),
                                 border: InputBorder.none,
                               ),
@@ -294,10 +468,10 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
               decoration: BoxDecoration(
                 color: msg.isMe
-                    ? GlassTheme.iosBlue.withOpacity(0.82)
-                    : (isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.70)),
+                    ? GlassTheme.iosBlue.withValues(alpha: 0.82)
+                    : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.70)),
                 border: Border.all(
-                  color: Colors.white.withOpacity(msg.isMe ? 0.35 : (isDark ? 0.20 : 0.80)),
+                  color: Colors.white.withValues(alpha: msg.isMe ? 0.35 : (isDark ? 0.20 : 0.80)),
                 ),
               ),
               child: Text(
@@ -348,15 +522,15 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.65),
+                  color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.65),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: bubbleColor.withOpacity(0.75),
+                    color: bubbleColor.withValues(alpha: 0.75),
                     width: 1.4,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: bubbleColor.withOpacity(0.22),
+                      color: bubbleColor.withValues(alpha: 0.22),
                       blurRadius: 18,
                       offset: const Offset(0, 4),
                     ),
@@ -368,7 +542,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: bubbleColor.withOpacity(0.25),
+                        color: bubbleColor.withValues(alpha: 0.25),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(icon, color: bubbleColor, size: 18),

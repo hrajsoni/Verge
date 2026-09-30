@@ -94,10 +94,10 @@ class ApiClient {
     return _dio.post(
       '/chat/conversations/$conversationId/messages',
       data: {
-        if (text != null) 'text': text,
-        if (mediaId != null) 'mediaId': mediaId,
-        if (snapDuration != null) 'snapViewDuration': snapDuration,
-        if (snapMaxViews != null) 'snapMaxViews': snapMaxViews,
+        'text': ?text,
+        'mediaId': ?mediaId,
+        'snapViewDuration': ?snapDuration,
+        'snapMaxViews': ?snapMaxViews,
       },
     );
   }
@@ -125,6 +125,30 @@ class ApiClient {
         'sizeBytes': sizeBytes,
       },
     );
+  }
+
+  /// Upload raw image/video binary directly to S3 via presigned PUT URL
+  Future<Response> uploadFileToS3({
+    required String presignedUrl,
+    required List<int> fileBytes,
+    required String mimeType,
+  }) {
+    final s3Dio = Dio();
+    return s3Dio.put(
+      presignedUrl,
+      data: Stream.fromIterable([fileBytes]),
+      options: Options(
+        headers: {
+          'Content-Type': mimeType,
+          'Content-Length': fileBytes.length,
+        },
+      ),
+    );
+  }
+
+  // Onboarding
+  Future<Response> completeOnboarding(Map<String, dynamic> data) {
+    return _dio.post('/users/me/onboarding', data: data);
   }
 
   // Profile

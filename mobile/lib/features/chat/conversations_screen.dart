@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/network/api_client.dart';
 import '../../core/theme/glass_theme.dart';
 import '../../core/widgets/liquid_glass_card.dart';
 import 'chat_screen.dart';
@@ -27,12 +28,20 @@ class ConversationItem {
   });
 }
 
-class ConversationsScreen extends StatelessWidget {
+class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
 
-  final List<ConversationItem> _conversations = const [
+  @override
+  State<ConversationsScreen> createState() => _ConversationsScreenState();
+}
+
+class _ConversationsScreenState extends State<ConversationsScreen> {
+  final List<ConversationItem> _conversations = [];
+  bool _isLoading = false;
+
+  final List<ConversationItem> _fallbackConversations = const [
     ConversationItem(
-      id: "1",
+      id: "demo_1",
       name: "Sophia Vance",
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
       lastMessage: "New Snap received • Tap to view",
@@ -41,7 +50,7 @@ class ConversationsScreen extends StatelessWidget {
       unreadCount: 1,
     ),
     ConversationItem(
-      id: "2",
+      id: "demo_2",
       name: "Elena Rostova",
       avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
       lastMessage: "Are you going to the exhibition tomorrow?",
@@ -50,7 +59,7 @@ class ConversationsScreen extends StatelessWidget {
       unreadCount: 0,
     ),
     ConversationItem(
-      id: "3",
+      id: "demo_3",
       name: "Aria Chen",
       avatar: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=800&auto=format&fit=crop&q=80",
       lastMessage: "Sent you a playlist link!",
@@ -61,8 +70,58 @@ class ConversationsScreen extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadConversations();
+  }
+
+  Future<void> _loadConversations() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await ApiClient().getConversations();
+      if (res.data != null && res.data is List && (res.data as List).isNotEmpty) {
+        final items = (res.data as List).map<ConversationItem>((raw) {
+          final otherUser = raw['otherUser'] ?? {};
+          final lastMsg = raw['lastMessage'] ?? {};
+          return ConversationItem(
+            id: raw['id'] ?? '',
+            name: otherUser['displayName'] ?? 'New Friend',
+            avatar: otherUser['avatarUrl'] ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
+            lastMessage: lastMsg['isSnap'] == true
+                ? 'Ephemeral Snap'
+                : (lastMsg['text'] ?? 'Say hello!'),
+            time: 'now',
+            hasUnopenedSnap: lastMsg['isSnap'] == true,
+            unreadCount: raw['unreadCount'] ?? 0,
+          );
+        }).toList();
+
+        if (mounted) {
+          setState(() {
+            _conversations.clear();
+            _conversations.addAll(items);
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Conversations] Loaded offline fallback: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _conversations.clear();
+        _conversations.addAll(_fallbackConversations);
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayList = _conversations.isNotEmpty ? _conversations : _fallbackConversations;
 
     return SafeArea(
       bottom: false,
@@ -76,21 +135,24 @@ class ConversationsScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("Messages", style: GlassTheme.headline(isDark: isDark)),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.6),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.15 : 0.7)),
-                      ),
-                      child: Icon(
-                        CupertinoIcons.square_pencil,
-                        color: isDark ? Colors.white : Colors.black87,
-                        size: 20,
+                GestureDetector(
+                  onTap: _loadConversations,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.6),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.7)),
+                        ),
+                        child: Icon(
+                          _isLoading ? CupertinoIcons.arrow_2_circlepath : CupertinoIcons.square_pencil,
+                          color: isDark ? Colors.white : Colors.black87,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -105,9 +167,9 @@ class ConversationsScreen extends StatelessWidget {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _conversations.length,
+              itemCount: displayList.length,
               itemBuilder: (context, index) {
-                final item = _conversations[index];
+                final item = displayList[index];
                 return Padding(
                   padding: const EdgeInsets.only(right: 16),
                   child: Column(
@@ -123,7 +185,7 @@ class ConversationsScreen extends StatelessWidget {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: GlassTheme.snapYellow.withOpacity(0.25),
+                              color: GlassTheme.snapYellow.withValues(alpha: 0.25),
                               blurRadius: 10,
                             ),
                           ],
@@ -150,9 +212,9 @@ class ConversationsScreen extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              itemCount: _conversations.length,
+              itemCount: displayList.length,
               itemBuilder: (context, index) {
-                final item = _conversations[index];
+                final item = displayList[index];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: LiquidGlassCard(
@@ -165,6 +227,7 @@ class ConversationsScreen extends StatelessWidget {
                           builder: (_) => ChatScreen(
                             peerName: item.name,
                             peerAvatar: item.avatar,
+                            conversationId: item.id,
                           ),
                         ),
                       );

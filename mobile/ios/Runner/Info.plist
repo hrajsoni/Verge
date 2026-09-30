@@ -65,6 +65,15 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Be-Snap requires camera access to take snaps and video moments.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Be-Snap requires microphone access to record audio in snaps.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Be-Snap requires photo library access to upload profile pictures and memories.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Be-Snap uses your location to discover matches nearby.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Be-Snap uses your location to calculate proximity for discovery feeds.</string>
 </dict>
 </plist>

@@ -4,7 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/network/api_client.dart';
 import '../../core/theme/glass_theme.dart';
+import '../../core/widgets/liquid_glass_button.dart';
 import '../../core/widgets/liquid_glass_card.dart';
 
 class DiscoveryProfile {
@@ -39,9 +41,13 @@ class DiscoveryScreen extends StatefulWidget {
 class _DiscoveryScreenState extends State<DiscoveryScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  int _activePhotoIndex = 0;
   Offset _dragOffset = Offset.zero;
   double _dragAngle = 0.0;
   late AnimationController _hoverController;
+
+  // History stack for Tinder Rewind mechanic
+  final List<int> _swipeHistory = [];
 
   final List<DiscoveryProfile> _profiles = const [
     DiscoveryProfile(
@@ -54,6 +60,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
       photos: [
         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
         "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
       ],
     ),
     DiscoveryProfile(
@@ -65,6 +72,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
       interests: ["Coffee", "Design", "Running", "Travel"],
       photos: [
         "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80",
       ],
     ),
     DiscoveryProfile(
@@ -76,6 +84,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
       interests: ["Coding", "Electronic", "Boba", "Gaming"],
       photos: [
         "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
       ],
     ),
   ];
@@ -98,11 +107,335 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
 
   void _onSwipe(bool isLike) {
     HapticFeedback.mediumImpact();
+    if (_currentIndex < _profiles.length) {
+      final currentProfile = _profiles[_currentIndex];
+      _swipeHistory.add(_currentIndex);
+
+      // Call backend swipe API
+      ApiClient().swipeUser(currentProfile.id, isLike ? 'LIKE' : 'PASS').catchError((e) {
+        debugPrint('[Discovery] Swipe API fallback: $e');
+        return e;
+      });
+
+      // Tinder-style Match trigger (if Sophia or mutual)
+      if (isLike && currentProfile.id == "1") {
+        _showMatchCelebration(currentProfile);
+      }
+    }
+
     setState(() {
       _currentIndex++;
+      _activePhotoIndex = 0;
       _dragOffset = Offset.zero;
       _dragAngle = 0.0;
     });
+  }
+
+  void _undoSwipe() {
+    if (_swipeHistory.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.white.withValues(alpha: 0.20),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: const Text("No previous swipes to rewind!", style: TextStyle(color: Colors.white)),
+        ),
+      );
+      return;
+    }
+
+    HapticFeedback.heavyImpact();
+    setState(() {
+      final lastIndex = _swipeHistory.removeLast();
+      _currentIndex = lastIndex;
+      _activePhotoIndex = 0;
+      _dragOffset = Offset.zero;
+      _dragAngle = 0.0;
+    });
+  }
+
+  void _showMatchCelebration(DiscoveryProfile profile) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Match Celebration",
+      barrierColor: Colors.black.withValues(alpha: 0.88),
+      transitionDuration: const Duration(milliseconds: 400),
+      transitionBuilder: (context, anim, _, child) {
+        return Transform.scale(
+          scale: Curves.easeOutBack.transform(anim.value),
+          child: Opacity(opacity: anim.value, child: child),
+        );
+      },
+      pageBuilder: (context, anim1, anim2) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: LiquidGlassCard(
+                borderRadius: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Glowing Flame Icon
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: GlassTheme.snapYellow,
+                        boxShadow: [
+                          BoxShadow(
+                            color: GlassTheme.snapYellow.withValues(alpha: 0.5),
+                            blurRadius: 28,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Icon(CupertinoIcons.flame_fill, color: Colors.black, size: 36),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "It's a Match!",
+                      style: GlassTheme.headline(isDark: isDark).copyWith(
+                        fontSize: 32,
+                        color: GlassTheme.snapYellow,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "You and ${profile.name} liked each other.",
+                      textAlign: TextAlign.center,
+                      style: GlassTheme.body(isDark: isDark).copyWith(fontSize: 15),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Dual Spring Avatars
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: GlassTheme.iosBlue, width: 2.5),
+                          ),
+                          child: const CircleAvatar(
+                            radius: 44,
+                            backgroundImage: NetworkImage(
+                              "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800",
+                            ),
+                          ),
+                        ),
+                        Transform.translate(
+                          offset: const Offset(-16, 0),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: GlassTheme.snapYellow, width: 2.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: GlassTheme.snapYellow.withValues(alpha: 0.35),
+                                  blurRadius: 18,
+                                ),
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              radius: 44,
+                              backgroundImage: CachedNetworkImageProvider(profile.photos.first),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 36),
+
+                    // Action Buttons
+                    LiquidGlassButton(
+                      label: "Send a Snap",
+                      variant: GlassButtonVariant.primary,
+                      accentColor: GlassTheme.snapYellow,
+                      icon: const Icon(CupertinoIcons.camera_fill, color: Colors.black, size: 18),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        widget.onOpenMatches?.call();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    LiquidGlassButton(
+                      label: "Keep Swiping",
+                      variant: GlassButtonVariant.secondary,
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showProfileDetailSheet(DiscoveryProfile profile, bool isDark) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.88,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          builder: (context, scrollController) {
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: Container(
+                  color: isDark ? Colors.black.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.90),
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.only(bottom: 40),
+                    children: [
+                      // Pull handle
+                      Center(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 12),
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+
+                      // Photos Carousel
+                      SizedBox(
+                        height: 380,
+                        child: PageView.builder(
+                          itemCount: profile.photos.length,
+                          itemBuilder: (context, pIdx) {
+                            return CachedNetworkImage(
+                              imageUrl: profile.photos[pIdx],
+                              fit: BoxFit.cover,
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Profile Info
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  "${profile.name}, ${profile.age}",
+                                  style: GlassTheme.headline(isDark: isDark).copyWith(fontSize: 28),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(CupertinoIcons.checkmark_seal_fill, color: GlassTheme.iosBlue, size: 22),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(CupertinoIcons.location_solid, color: GlassTheme.iosBlue, size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "${profile.distanceKm} km nearby",
+                                  style: GlassTheme.caption(isDark: isDark).copyWith(
+                                    color: GlassTheme.iosBlue,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text("About Me", style: GlassTheme.title(isDark: isDark)),
+                            const SizedBox(height: 8),
+                            Text(profile.bio, style: GlassTheme.body(isDark: isDark).copyWith(fontSize: 15)),
+                            const SizedBox(height: 20),
+                            Text("Interests & Passions", style: GlassTheme.title(isDark: isDark)),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: profile.interests.map((interest) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: GlassTheme.iosBlue.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: GlassTheme.iosBlue.withValues(alpha: 0.35)),
+                                  ),
+                                  child: Text(
+                                    interest,
+                                    style: const TextStyle(
+                                      color: GlassTheme.iosBlue,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 32),
+                            // Quick Action Buttons
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildActionButton(
+                                  icon: CupertinoIcons.clear,
+                                  color: Colors.redAccent,
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    _onSwipe(false);
+                                  },
+                                  size: 60,
+                                ),
+                                _buildActionButton(
+                                  icon: CupertinoIcons.heart_fill,
+                                  color: Colors.pinkAccent,
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    _onSwipe(true);
+                                  },
+                                  size: 60,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -114,7 +447,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
       bottom: false,
       child: Column(
         children: [
-          // iOS Liquid Glass Top Header with subtle shimmer
+          // iOS Liquid Glass Top Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: Row(
@@ -126,13 +459,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: GlassTheme.snapYellow,
                         shape: BoxShape.circle,
+                        color: GlassTheme.snapYellow,
                         boxShadow: [
                           BoxShadow(
-                            color: GlassTheme.snapYellow.withValues(alpha: 0.45),
-                            blurRadius: 14,
-                            spreadRadius: 1,
+                            color: GlassTheme.snapYellow.withValues(alpha: 0.4),
+                            blurRadius: 12,
                           ),
                         ],
                       ),
@@ -258,20 +590,33 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
             ),
           ),
 
-          // Bottom Action Bar with Liquid Pulsing Rings
+          // Bottom Action Bar with Tinder-inspired Rewind + Pass + Super Like + Like
           Padding(
             padding: const EdgeInsets.only(bottom: 96, top: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Rewind / Undo Button
+                _buildActionButton(
+                  icon: CupertinoIcons.arrow_counterclockwise,
+                  color: const Color(0xFFF59E0B),
+                  isDark: isDark,
+                  onTap: _undoSwipe,
+                  size: 48,
+                ),
+                const SizedBox(width: 16),
+
+                // Pass Button
                 _buildActionButton(
                   icon: CupertinoIcons.clear,
                   color: Colors.redAccent,
                   isDark: isDark,
                   onTap: () => _onSwipe(false),
-                  size: 56,
+                  size: 58,
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 16),
+
+                // Super Like Button
                 _buildActionButton(
                   icon: CupertinoIcons.star_fill,
                   color: GlassTheme.snapYellow,
@@ -280,16 +625,18 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                     HapticFeedback.heavyImpact();
                     _onSwipe(true);
                   },
-                  size: 68,
-                  isPrimary: true,
+                  size: 48,
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 16),
+
+                // Like Button
                 _buildActionButton(
                   icon: CupertinoIcons.heart_fill,
                   color: Colors.pinkAccent,
                   isDark: isDark,
                   onTap: () => _onSwipe(true),
-                  size: 56,
+                  size: 58,
+                  isPrimary: true,
                 ),
               ],
             ),
@@ -329,16 +676,86 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
   }
 
   Widget _buildProfileCard(DiscoveryProfile profile, bool isDark, {required bool isTop}) {
+    final photoUrl = profile.photos.length > _activePhotoIndex
+        ? profile.photos[_activePhotoIndex]
+        : profile.photos.first;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(32),
       child: Stack(
         fit: StackFit.expand,
         children: [
+          // Background Photo
           CachedNetworkImage(
-            imageUrl: profile.photos.first,
+            imageUrl: photoUrl,
             fit: BoxFit.cover,
             placeholder: (context, _) => Container(color: Colors.grey.shade900),
           ),
+
+          // Story Segments at top (Tinder/Instagram pattern)
+          if (profile.photos.length > 1)
+            Positioned(
+              top: 14,
+              left: 16,
+              right: 16,
+              child: Row(
+                children: List.generate(profile.photos.length, (idx) {
+                  final isCurrent = idx == _activePhotoIndex;
+                  return Expanded(
+                    child: Container(
+                      height: 3.5,
+                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(2),
+                        color: isCurrent ? Colors.white : Colors.white.withValues(alpha: 0.35),
+                        boxShadow: isCurrent
+                            ? [
+                                BoxShadow(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  blurRadius: 4,
+                                ),
+                              ]
+                            : null,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+          // Left/Right touch targets for multi-photo navigation
+          if (isTop) ...[
+            Positioned(
+              left: 0,
+              top: 40,
+              bottom: 120,
+              width: MediaQuery.of(context).size.width * 0.35,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  if (_activePhotoIndex > 0) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _activePhotoIndex--);
+                  }
+                },
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 40,
+              bottom: 120,
+              width: MediaQuery.of(context).size.width * 0.65,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  if (_activePhotoIndex < profile.photos.length - 1) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _activePhotoIndex++);
+                  }
+                },
+              ),
+            ),
+          ],
 
           // Gradient overlay
           Container(
@@ -366,6 +783,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
               borderRadius: 24,
               opacity: 0.9,
               enableLightShimmer: isTop,
+              onTap: isTop ? () => _showProfileDetailSheet(profile, isDark) : null,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -401,6 +819,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Info 'i' button for expanding details
+                      GestureDetector(
+                        onTap: () => _showProfileDetailSheet(profile, isDark),
+                        child: const Icon(CupertinoIcons.info_circle_fill, color: Colors.white, size: 22),
                       ),
                     ],
                   ),
@@ -504,6 +928,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
               "Check back soon or expand your discovery radius in settings.",
               textAlign: TextAlign.center,
               style: GlassTheme.body(isDark: isDark),
+            ),
+            const SizedBox(height: 24),
+            LiquidGlassButton(
+              label: "Rewind Swipes",
+              variant: GlassButtonVariant.primary,
+              accentColor: GlassTheme.snapYellow,
+              icon: const Icon(CupertinoIcons.arrow_counterclockwise, color: Colors.black, size: 18),
+              onPressed: _undoSwipe,
             ),
           ],
         ),

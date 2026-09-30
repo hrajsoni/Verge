@@ -36,7 +36,7 @@ class LiquidSnapViewer extends StatefulWidget {
     return showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.92),
+      barrierColor: Colors.black.withValues(alpha: 0.92),
       transitionDuration: const Duration(milliseconds: 320),
       pageBuilder: (context, anim1, anim2) {
         return LiquidSnapViewer(
@@ -61,13 +61,14 @@ class LiquidSnapViewer extends StatefulWidget {
 class _LiquidSnapViewerState extends State<LiquidSnapViewer>
     with SingleTickerProviderStateMixin {
   late AnimationController _progressController;
-  Timer? _countdownTimer;
   late int _remainingSeconds;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
     super.initState();
     _remainingSeconds = widget.durationSeconds;
+
     _progressController = AnimationController(
       vsync: this,
       duration: Duration(seconds: widget.durationSeconds),
@@ -78,27 +79,27 @@ class _LiquidSnapViewerState extends State<LiquidSnapViewer>
     });
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 1) {
-        setState(() {
+      if (!mounted) return;
+      setState(() {
+        if (_remainingSeconds > 1) {
           _remainingSeconds--;
-        });
-      } else {
-        timer.cancel();
-      }
+        } else {
+          timer.cancel();
+        }
+      });
     });
-  }
-
-  void _finishSnap() {
-    _countdownTimer?.cancel();
-    HapticFeedback.mediumImpact();
-    widget.onFinished();
   }
 
   @override
   void dispose() {
-    _progressController.dispose();
     _countdownTimer?.cancel();
+    _progressController.dispose();
     super.dispose();
+  }
+
+  void _finishSnap() {
+    HapticFeedback.lightImpact();
+    widget.onFinished();
   }
 
   @override
@@ -117,7 +118,7 @@ class _LiquidSnapViewerState extends State<LiquidSnapViewer>
               placeholder: (context, _) => const Center(
                 child: CupertinoActivityIndicator(color: Colors.white, radius: 18),
               ),
-              errorWidget: (context, _, __) => Center(
+              errorWidget: (context, url, error) => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -146,9 +147,9 @@ class _LiquidSnapViewerState extends State<LiquidSnapViewer>
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.45),
+                          color: Colors.black.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           children: [
@@ -174,8 +175,8 @@ class _LiquidSnapViewerState extends State<LiquidSnapViewer>
                         height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.black.withOpacity(0.45),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          color: Colors.black.withValues(alpha: 0.45),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Stack(
                           alignment: Alignment.center,
@@ -187,7 +188,7 @@ class _LiquidSnapViewerState extends State<LiquidSnapViewer>
                                   value: 1.0 - _progressController.value,
                                   strokeWidth: 3.0,
                                   valueColor: const AlwaysStoppedAnimation(GlassTheme.snapYellow),
-                                  backgroundColor: Colors.white.withOpacity(0.15),
+                                  backgroundColor: Colors.white.withValues(alpha: 0.15),
                                 );
                               },
                             ),

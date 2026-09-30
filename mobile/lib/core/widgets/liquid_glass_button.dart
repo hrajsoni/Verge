@@ -60,13 +60,13 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton>
     super.dispose();
   }
 
-  void _onTapDown(TapDownDetails _) {
+  void _onTapDown(TapDownDetails details) {
     if (widget.onPressed == null || widget.isLoading) return;
     HapticFeedback.lightImpact();
     _animController.forward();
   }
 
-  void _onTapUp(TapUpDetails _) {
+  void _onTapUp(TapUpDetails details) {
     if (widget.onPressed == null || widget.isLoading) return;
     _animController.reverse();
     widget.onPressed?.call();
@@ -82,10 +82,12 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton>
 
     return AnimatedBuilder(
       animation: _scaleAnimation,
-      builder: (context, child) => Transform.scale(
-        scale: _scaleAnimation.value,
-        child: child,
-      ),
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        );
+      },
       child: GestureDetector(
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
@@ -126,6 +128,7 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton>
                             ),
                         ],
                       ),
+              ),
             ),
           ),
         ),
@@ -136,23 +139,24 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton>
   BoxDecoration _buildDecoration(bool isDark) {
     switch (widget.variant) {
       case GlassButtonVariant.primary:
+        final baseColor = widget.accentColor ?? GlassTheme.iosBlue;
         return BoxDecoration(
           borderRadius: BorderRadius.circular(widget.borderRadius),
           gradient: LinearGradient(
             colors: [
-              widget.accentColor ?? GlassTheme.iosBlue,
-              (widget.accentColor ?? GlassTheme.iosBlue).withOpacity(0.85),
+              baseColor,
+              baseColor.withValues(alpha: 0.85),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           border: Border.all(
             width: 1.2,
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
           ),
           boxShadow: [
             BoxShadow(
-              color: (widget.accentColor ?? GlassTheme.iosBlue).withOpacity(0.38),
+              color: baseColor.withValues(alpha: 0.38),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -164,13 +168,13 @@ class _LiquidGlassButtonState extends State<LiquidGlassButton>
         return BoxDecoration(
           borderRadius: BorderRadius.circular(widget.borderRadius),
           color: isDark
-              ? Colors.white.withOpacity(0.12)
-              : Colors.white.withOpacity(0.65),
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.65),
           border: Border.all(
             width: 1.2,
             color: isDark
-                ? Colors.white.withOpacity(0.24)
-                : Colors.white.withOpacity(0.80),
+                ? Colors.white.withValues(alpha: 0.24)
+                : Colors.white.withValues(alpha: 0.80),
           ),
           boxShadow: GlassTheme.glassShadow(isDark),
         );

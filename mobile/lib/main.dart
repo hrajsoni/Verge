@@ -7,6 +7,7 @@ import 'core/widgets/liquid_mesh_background.dart';
 import 'features/camera/camera_screen.dart';
 import 'features/chat/conversations_screen.dart';
 import 'features/discovery/discovery_screen.dart';
+import 'features/onboarding/onboarding_screen.dart';
 import 'features/profile/profile_screen.dart';
 
 void main() {
@@ -21,8 +22,15 @@ void main() {
   runApp(const BeSnapApp());
 }
 
-class BeSnapApp extends StatelessWidget {
+class BeSnapApp extends StatefulWidget {
   const BeSnapApp({super.key});
+
+  @override
+  State<BeSnapApp> createState() => _BeSnapAppState();
+}
+
+class _BeSnapAppState extends State<BeSnapApp> {
+  bool _isOnboardingDone = true; // Default to main shell, toggleable in Profile
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +52,28 @@ class BeSnapApp extends StatelessWidget {
           primaryColor: GlassTheme.iosBlue,
         ),
       ),
-      home: const MainNavigationShell(),
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: _isOnboardingDone
+            ? MainNavigationShell(
+                onRestartOnboarding: () {
+                  setState(() => _isOnboardingDone = false);
+                },
+              )
+            : OnboardingScreen(
+                onOnboardingCompleted: () {
+                  setState(() => _isOnboardingDone = true);
+                },
+              ),
+      ),
     );
   }
 }
 
 class MainNavigationShell extends StatefulWidget {
-  const MainNavigationShell({super.key});
+  final VoidCallback? onRestartOnboarding;
+
+  const MainNavigationShell({super.key, this.onRestartOnboarding});
 
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();
@@ -59,12 +82,24 @@ class MainNavigationShell extends StatefulWidget {
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _tabs = [
-    const DiscoveryScreen(),
-    CameraScreen(onSnapCaptured: () {}),
-    const ConversationsScreen(),
-    const ProfileScreen(),
-  ];
+  late final List<Widget> _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      const DiscoveryScreen(),
+      CameraScreen(
+        onSnapCaptured: () {
+          setState(() => _currentIndex = 2); // Switch to Chat/Messages tab
+        },
+      ),
+      const ConversationsScreen(),
+      ProfileScreen(
+        onRestartOnboarding: widget.onRestartOnboarding,
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
