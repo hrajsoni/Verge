@@ -16,6 +16,9 @@ class ConversationItem {
   final String time;
   final bool hasUnopenedSnap;
   final int unreadCount;
+  final int? streakDays;
+  final int? streakHoursRemaining;
+  final int? matchExpiresInHours;
 
   const ConversationItem({
     required this.id,
@@ -25,6 +28,9 @@ class ConversationItem {
     required this.time,
     this.hasUnopenedSnap = false,
     this.unreadCount = 0,
+    this.streakDays,
+    this.streakHoursRemaining,
+    this.matchExpiresInHours,
   });
 }
 
@@ -48,6 +54,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       time: "2m",
       hasUnopenedSnap: true,
       unreadCount: 1,
+      streakDays: 8,
+      streakHoursRemaining: 3, // Loss-aversion: 3h remaining to keep streak!
     ),
     ConversationItem(
       id: "demo_2",
@@ -57,6 +65,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       time: "1h",
       hasUnopenedSnap: false,
       unreadCount: 0,
+      streakDays: 5,
+      streakHoursRemaining: 16,
     ),
     ConversationItem(
       id: "demo_3",
@@ -66,6 +76,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       time: "3h",
       hasUnopenedSnap: false,
       unreadCount: 0,
+      matchExpiresInHours: 19, // Bumble 24h anti-ghosting match countdown
     ),
   ];
 
@@ -161,41 +172,84 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             ),
           ),
 
-          // Matches Story Carousel
+          // Matches Story Carousel with Bumble-style 24-hour Expiring Match Countdowns
           SizedBox(
-            height: 98,
+            height: 104,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: displayList.length,
               itemBuilder: (context, index) {
                 final item = displayList[index];
+                final isExpiringMatch = item.matchExpiresInHours != null;
+
                 return Padding(
                   padding: const EdgeInsets.only(right: 16),
                   child: Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [GlassTheme.snapYellow, GlassTheme.iosPink, GlassTheme.iosPurple],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: GlassTheme.snapYellow.withValues(alpha: 0.25),
-                              blurRadius: 10,
+                      Stack(
+                        alignment: Alignment.bottomCenter,
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: isExpiringMatch
+                                  ? const LinearGradient(
+                                      colors: [Color(0xFFFFB703), Color(0xFFFB8500)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : const LinearGradient(
+                                      colors: [GlassTheme.snapYellow, GlassTheme.iosPink, GlassTheme.iosPurple],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isExpiringMatch ? const Color(0xFFFB8500) : GlassTheme.snapYellow)
+                                      .withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 28,
-                          backgroundImage: CachedNetworkImageProvider(item.avatar),
-                        ),
+                            child: CircleAvatar(
+                              radius: 28,
+                              backgroundImage: CachedNetworkImageProvider(item.avatar),
+                            ),
+                          ),
+                          // Bumble-inspired Anti-Ghosting Match Countdown Badge
+                          if (isExpiringMatch)
+                            Positioned(
+                              bottom: -6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFB8500),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white, width: 1.2),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(CupertinoIcons.timer, color: Colors.white, size: 9),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      "${item.matchExpiresInHours}h",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Text(
                         item.name.split(' ').first,
                         style: GlassTheme.caption(isDark: isDark).copyWith(fontSize: 11),
@@ -215,6 +269,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               itemCount: displayList.length,
               itemBuilder: (context, index) {
                 final item = displayList[index];
+                final hasStreak = item.streakDays != null;
+                final isStreakUrgent = item.streakHoursRemaining != null && item.streakHoursRemaining! <= 4;
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: LiquidGlassCard(
@@ -246,9 +303,57 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    item.name,
-                                    style: GlassTheme.title(isDark: isDark).copyWith(fontSize: 16),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: GlassTheme.title(isDark: isDark).copyWith(fontSize: 16),
+                                      ),
+                                      // Snapchat Streaks Engine (🔥 Daily Reciprocal Snaps)
+                                      if (hasStreak) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isStreakUrgent
+                                                ? Colors.deepOrange.withValues(alpha: 0.22)
+                                                : Colors.orangeAccent.withValues(alpha: 0.16),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: isStreakUrgent
+                                                  ? Colors.deepOrange
+                                                  : Colors.orangeAccent.withValues(alpha: 0.50),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text("🔥", style: TextStyle(fontSize: 11)),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                "${item.streakDays}",
+                                                style: TextStyle(
+                                                  color: isStreakUrgent ? Colors.deepOrange : Colors.orangeAccent,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              if (isStreakUrgent) ...[
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  "⏳ ${item.streakHoursRemaining}h",
+                                                  style: const TextStyle(
+                                                    color: Colors.deepOrangeAccent,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   Text(
                                     item.time,

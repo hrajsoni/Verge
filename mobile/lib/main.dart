@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/glass_theme.dart';
 import 'core/widgets/liquid_glass_nav_bar.dart';
 import 'core/widgets/liquid_mesh_background.dart';
@@ -19,25 +20,28 @@ void main() {
       systemNavigationBarColor: Colors.transparent,
     ),
   );
-  runApp(const BeSnapApp());
+  runApp(const VergeApp());
 }
 
-class BeSnapApp extends StatefulWidget {
-  const BeSnapApp({super.key});
+class VergeApp extends StatefulWidget {
+  const VergeApp({super.key});
 
   @override
-  State<BeSnapApp> createState() => _BeSnapAppState();
+  State<VergeApp> createState() => _VergeAppState();
 }
 
-class _BeSnapAppState extends State<BeSnapApp> {
+class _VergeAppState extends State<VergeApp> {
   bool _isOnboardingDone = true; // Default to main shell, toggleable in Profile
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Be-Snap',
+      title: 'Verge',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
+      builder: (context, child) {
+        return LiquidNotificationBannerOverlay(child: child ?? const SizedBox());
+      },
       darkTheme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF090A0F),
         cupertinoOverrideTheme: const CupertinoThemeData(

@@ -317,7 +317,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            "Welcome to Be-Snap",
+            "Welcome to Verge",
             textAlign: TextAlign.center,
             style: GlassTheme.headline(isDark: isDark).copyWith(fontSize: 32),
           ),
@@ -370,7 +370,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 20),
           Text("What's your name & age?", style: GlassTheme.headline(isDark: isDark)),
           const SizedBox(height: 8),
-          Text("Your age will be public. Be-Snap is strictly 18+.", style: GlassTheme.body(isDark: isDark)),
+          Text("Your age will be public. Verge is strictly 18+.", style: GlassTheme.body(isDark: isDark)),
           const SizedBox(height: 28),
 
           // Name Input
@@ -718,7 +718,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text("Enable Location", style: GlassTheme.headline(isDark: isDark)),
           const SizedBox(height: 12),
           Text(
-            "Be-Snap calculates distances to show you genuine profiles nearby. Your precise coordinates are never shared with other users.",
+            "Verge calculates distances to show you genuine profiles nearby. Your precise coordinates are never shared with other users.",
             textAlign: TextAlign.center,
             style: GlassTheme.body(isDark: isDark),
           ),

@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
   static const String _defaultBaseUrl = "http://localhost:3000/v1";
-  static const String _storageTokenKey = "besnap_jwt_token";
+  static const String _storageTokenKey = "verge_jwt_token";
 
   late final Dio _dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -159,4 +159,10 @@ class ApiClient {
   Future<Response> updateMyProfile(Map<String, dynamic> data) {
     return _dio.patch('/users/me', data: data);
   }
+
+  // Generic HTTP POST
+  Future<Response> post(String path, dynamic data) {
+    return _dio.post(path, data: data);
+  }
 }
+

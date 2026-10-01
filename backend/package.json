@@ -1,7 +1,7 @@
 {
-  "name": "backend",
-  "version": "0.0.1",
-  "description": "",
+  "name": "verge-backend",
+  "version": "0.1.0",
+  "description": "Verge API — Real-time Proximity Social Dating with Ephemeral Snaps & Streaks Engine",
   "author": "",
   "private": true,
   "license": "UNLICENSED",

@@ -127,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 14),
                 Text(_displayName, style: GlassTheme.headline(isDark: isDark).copyWith(fontSize: 22)),
                 const SizedBox(height: 4),
-                Text("@besnap_user • 24", style: GlassTheme.caption(isDark: isDark)),
+                Text("@verge_user • 24", style: GlassTheme.caption(isDark: isDark)),
                 const SizedBox(height: 12),
                 Text(
                   _bio,

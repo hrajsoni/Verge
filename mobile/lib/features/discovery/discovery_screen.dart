@@ -49,8 +49,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
   // History stack for Tinder Rewind mechanic
   final List<int> _swipeHistory = [];
 
-  final List<DiscoveryProfile> _profiles = const [
-    DiscoveryProfile(
+  double _discoveryRadiusKm = 25.0;
+  bool _isExpandingRadius = false;
+
+  final List<DiscoveryProfile> _profiles = [
+    const DiscoveryProfile(
       id: "1",
       name: "Sophia Vance",
       age: 23,
@@ -63,7 +66,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
         "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
       ],
     ),
-    DiscoveryProfile(
+    const DiscoveryProfile(
       id: "2",
       name: "Elena Rostova",
       age: 24,
@@ -75,7 +78,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
         "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80",
       ],
     ),
-    DiscoveryProfile(
+    const DiscoveryProfile(
       id: "3",
       name: "Aria Chen",
       age: 22,
@@ -89,6 +92,45 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
     ),
   ];
 
+  final List<DiscoveryProfile> _extendedPool = const [
+    DiscoveryProfile(
+      id: "4",
+      name: "Chloe Kim",
+      age: 23,
+      distanceKm: 28.5,
+      bio: "Snowboarder & UX designer. Always hunting for the city's crispest pour-over coffee ☕️🏂",
+      interests: ["Design", "Snowboarding", "Coffee", "Cinema"],
+      photos: [
+        "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&auto=format&fit=crop&q=80",
+      ],
+    ),
+    DiscoveryProfile(
+      id: "5",
+      name: "Marcus Vance",
+      age: 25,
+      distanceKm: 34.2,
+      bio: "Record producer & vinyl collector. Let's go to jazz clubs and talk synths 🎷🎹",
+      interests: ["Music", "Vinyl", "Audio", "Nightlife"],
+      photos: [
+        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&auto=format&fit=crop&q=80",
+      ],
+    ),
+    DiscoveryProfile(
+      id: "6",
+      name: "Zara Patel",
+      age: 24,
+      distanceKm: 42.0,
+      bio: "Art gallery curator & botanical enthusiast. Looking for someone to explore hidden museums with 🌿🖼️",
+      interests: ["Art", "Museums", "Plants", "Photography"],
+      photos: [
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop&q=80",
+      ],
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +139,24 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2800),
     )..repeat(reverse: true);
+
+    _prewarmNextDeckImages();
+  }
+
+  /// Tinder-style Deck Image Pre-warming: Pre-fetches the next 3 profiles' images
+  /// into RAM memory cache so swiping has zero image popping or blank cards.
+  void _prewarmNextDeckImages() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (int i = 0; i <= 3; i++) {
+        final idx = _currentIndex + i;
+        if (idx < _profiles.length) {
+          for (final photo in _profiles[idx].photos) {
+            precacheImage(CachedNetworkImageProvider(photo), context);
+          }
+        }
+      }
+    });
   }
 
   @override
@@ -129,6 +189,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
       _dragOffset = Offset.zero;
       _dragAngle = 0.0;
     });
+
+    _prewarmNextDeckImages();
   }
 
   void _undoSwipe() {
@@ -373,6 +435,15 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                             const SizedBox(height: 8),
                             Text(profile.bio, style: GlassTheme.body(isDark: isDark).copyWith(fontSize: 15)),
                             const SizedBox(height: 20),
+
+                            // Voice Prompt (Hinge / Tinder / RAW style interactive waveform)
+                            _VoicePromptPlayer(
+                              promptQuestion: "My most spontaneous weekend story 🎙️",
+                              audioDurationSeconds: 24,
+                              isDark: isDark,
+                            ),
+                            const SizedBox(height: 20),
+
                             Text("Interests & Passions", style: GlassTheme.title(isDark: isDark)),
                             const SizedBox(height: 10),
                             Wrap(
@@ -473,7 +544,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text("Be-Snap", style: GlassTheme.headline(isDark: isDark)),
+                    Text("Verge", style: GlassTheme.headline(isDark: isDark)),
                   ],
                 ),
                 ClipRRect(
@@ -914,32 +985,356 @@ class _DiscoveryScreenState extends State<DiscoveryScreen>
   }
 
   Widget _buildEmptyState(bool isDark) {
+    final estimatedProfiles = (_discoveryRadiusKm * 1.5).round();
+
     return Center(
-      child: LiquidGlassCard(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(CupertinoIcons.sparkles, color: GlassTheme.snapYellow, size: 48),
-            const SizedBox(height: 16),
-            Text("You're all caught up!", style: GlassTheme.title(isDark: isDark)),
-            const SizedBox(height: 8),
-            Text(
-              "Check back soon or expand your discovery radius in settings.",
-              textAlign: TextAlign.center,
-              style: GlassTheme.body(isDark: isDark),
-            ),
-            const SizedBox(height: 24),
-            LiquidGlassButton(
-              label: "Rewind Swipes",
-              variant: GlassButtonVariant.primary,
-              accentColor: GlassTheme.snapYellow,
-              icon: const Icon(CupertinoIcons.arrow_counterclockwise, color: Colors.black, size: 18),
-              onPressed: _undoSwipe,
-            ),
-          ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: LiquidGlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: GlassTheme.snapYellow.withValues(alpha: 0.18),
+                  border: Border.all(color: GlassTheme.snapYellow.withValues(alpha: 0.40)),
+                ),
+                child: const Center(
+                  child: Icon(CupertinoIcons.compass_fill, color: GlassTheme.snapYellow, size: 36),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text("Deck Depleted", style: GlassTheme.title(isDark: isDark).copyWith(fontSize: 22)),
+              const SizedBox(height: 6),
+              Text(
+                "You've seen everyone within ${_discoveryRadiusKm.round()} km.",
+                textAlign: TextAlign.center,
+                style: GlassTheme.body(isDark: isDark).copyWith(fontSize: 14),
+              ),
+              const SizedBox(height: 22),
+
+              // Interactive Discovery Radius Expansion Slider
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.40)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Expand Discovery Radius",
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          "${_discoveryRadiusKm.round()} km",
+                          style: const TextStyle(
+                            color: GlassTheme.snapYellow,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: GlassTheme.snapYellow,
+                        inactiveTrackColor: Colors.white.withValues(alpha: 0.20),
+                        thumbColor: Colors.white,
+                        overlayColor: GlassTheme.snapYellow.withValues(alpha: 0.20),
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                      ),
+                      child: Slider(
+                        value: _discoveryRadiusKm,
+                        min: 25.0,
+                        max: 100.0,
+                        divisions: 15,
+                        onChanged: (val) {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _discoveryRadiusKm = val;
+                          });
+                        },
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(CupertinoIcons.person_2_fill, color: GlassTheme.iosBlue, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Reveals ~$estimatedProfiles more people nearby",
+                          style: const TextStyle(
+                            color: GlassTheme.iosBlue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Expand & Search Button
+              LiquidGlassButton(
+                label: _isExpandingRadius ? "Searching Radar..." : "Expand Radius & Search",
+                isLoading: _isExpandingRadius,
+                variant: GlassButtonVariant.primary,
+                accentColor: GlassTheme.snapYellow,
+                icon: const Icon(CupertinoIcons.sparkles, color: Colors.black, size: 18),
+                onPressed: () async {
+                  HapticFeedback.heavyImpact();
+                  setState(() => _isExpandingRadius = true);
+                  await Future.delayed(const Duration(milliseconds: 650));
+                  if (!mounted) return;
+
+                  setState(() {
+                    _isExpandingRadius = false;
+                    // Append extended profiles to deck
+                    for (final p in _extendedPool) {
+                      if (!_profiles.any((existing) => existing.id == p.id)) {
+                        _profiles.add(p);
+                      }
+                    }
+                  });
+
+                  _prewarmNextDeckImages();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: Colors.white.withValues(alpha: 0.20),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      content: Row(
+                        children: [
+                          const Icon(CupertinoIcons.check_mark_circled_solid, color: GlassTheme.snapYellow),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Found ${_extendedPool.length} new people within ${_discoveryRadiusKm.round()} km!",
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 10),
+
+              if (_swipeHistory.isNotEmpty)
+                LiquidGlassButton(
+                  label: "Rewind Last Swipe",
+                  variant: GlassButtonVariant.secondary,
+                  icon: const Icon(CupertinoIcons.arrow_counterclockwise, color: Colors.white, size: 16),
+                  onPressed: _undoSwipe,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+/// Interactive Hinge/Tinder/RAW Voice Prompt Audio Player with dynamic animated waveform
+class _VoicePromptPlayer extends StatefulWidget {
+  final String promptQuestion;
+  final int audioDurationSeconds;
+  final bool isDark;
+
+  const _VoicePromptPlayer({
+    required this.promptQuestion,
+    required this.audioDurationSeconds,
+    required this.isDark,
+  });
+
+  @override
+  State<_VoicePromptPlayer> createState() => _VoicePromptPlayerState();
+}
+
+class _VoicePromptPlayerState extends State<_VoicePromptPlayer>
+    with SingleTickerProviderStateMixin {
+  bool _isPlaying = false;
+  late AnimationController _animController;
+  final List<double> _waveformHeights = const [
+    0.3, 0.6, 0.9, 0.4, 0.8, 1.0, 0.7, 0.5,
+    0.9, 0.6, 0.3, 0.8, 0.5, 0.9, 0.7, 0.4,
+    0.6, 0.8, 0.4, 0.2,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: widget.audioDurationSeconds),
+    );
+
+    _animController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          _isPlaying = false;
+        });
+        _animController.reset();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isPlaying = !_isPlaying;
+    });
+
+    if (_isPlaying) {
+      _animController.forward();
+    } else {
+      _animController.stop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: widget.isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: widget.isDark
+              ? Colors.white.withValues(alpha: 0.16)
+              : Colors.black.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(CupertinoIcons.mic_fill, color: GlassTheme.iosPink, size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  widget.promptQuestion,
+                  style: TextStyle(
+                    color: widget.isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          AnimatedBuilder(
+            animation: _animController,
+            builder: (context, _) {
+              final progress = _animController.value;
+              final currentSec = (progress * widget.audioDurationSeconds).round();
+
+              return Row(
+                children: [
+                  // Play/Pause button
+                  GestureDetector(
+                    onTap: _togglePlay,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [GlassTheme.iosPink, GlassTheme.iosPurple],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: GlassTheme.iosPink.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          _isPlaying ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Dynamic Waveform Bars
+                  Expanded(
+                    child: SizedBox(
+                      height: 36,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: List.generate(_waveformHeights.length, (idx) {
+                          final barProgress = idx / _waveformHeights.length;
+                          final isPlayed = progress >= barProgress;
+                          final baseHeight = _waveformHeights[idx] * 28;
+
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 3.5,
+                            height: _isPlaying
+                                ? (baseHeight + (isPlayed ? 4 : 0)).clamp(6.0, 32.0)
+                                : baseHeight.clamp(6.0, 32.0),
+                            decoration: BoxDecoration(
+                              color: isPlayed
+                                  ? GlassTheme.iosPink
+                                  : (widget.isDark ? Colors.white30 : Colors.black26),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Duration text
+                  Text(
+                    "0:${currentSec.toString().padLeft(2, '0')} / 0:${widget.audioDurationSeconds}",
+                    style: TextStyle(
+                      color: widget.isDark ? Colors.white60 : Colors.black54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+

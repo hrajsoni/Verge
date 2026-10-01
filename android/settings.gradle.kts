@@ -15,7 +15,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BeSnap"
+rootProject.name = "Verge"
 
 include(":app")
 include(":core:common")

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/socket_service.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/theme/glass_theme.dart';
 import '../../core/widgets/liquid_mesh_background.dart';
 import '../../core/widgets/liquid_snap_viewer.dart';
@@ -22,6 +23,9 @@ class ChatMessage {
   final int snapDurationSeconds;
   SnapState snapState;
   final bool allowReplay;
+  final bool isVoiceNote;
+  final int voiceDurationSeconds;
+  final bool isSystemAlert;
 
   ChatMessage({
     required this.id,
@@ -33,6 +37,9 @@ class ChatMessage {
     this.snapDurationSeconds = 5,
     this.snapState = SnapState.unopened,
     this.allowReplay = false,
+    this.isVoiceNote = false,
+    this.voiceDurationSeconds = 8,
+    this.isSystemAlert = false,
   });
 }
 
@@ -61,6 +68,7 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription? _msgSub;
   StreamSubscription? _typingSub;
   StreamSubscription? _stopTypingSub;
+  StreamSubscription? _screenshotSub;
 
   @override
   void initState() {
@@ -132,6 +140,33 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
+    // Client-side Screenshot Snooping Listener
+    _screenshotSub = SocketService().onScreenshotTaken.listen((data) {
+      if (data['conversationId'] == widget.conversationId && mounted) {
+        final alertText = "⚠️ Screenshot of ephemeral snap detected!";
+        setState(() {
+          _messages.add(
+            ChatMessage(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              text: alertText,
+              isMe: false,
+              timestamp: DateTime.now(),
+              isSystemAlert: true,
+            ),
+          );
+        });
+        NotificationService().showHeadsUp(
+          InAppNotification(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: "Screenshot Detected",
+            body: "${widget.peerName} took a screenshot of ephemeral snap!",
+            avatarUrl: widget.peerAvatar,
+            type: NotificationType.screenshotAlert,
+          ),
+        );
+      }
+    });
+
     _textController.addListener(_onTextChanged);
   }
 
@@ -143,12 +178,40 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _simulateScreenshotAlert() {
+    HapticFeedback.heavyImpact();
+    SocketService().sendScreenshotAlert(widget.conversationId);
+  }
+
+  void _sendVoiceNote() {
+    HapticFeedback.mediumImpact();
+    final newMsg = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      text: "Voice Note (0:08)",
+      isMe: true,
+      timestamp: DateTime.now(),
+      isVoiceNote: true,
+      voiceDurationSeconds: 8,
+    );
+    setState(() {
+      _messages.add(newMsg);
+    });
+    ApiClient().sendMessage(
+      conversationId: widget.conversationId,
+      text: "Voice Note (0:08)",
+    ).catchError((e) {
+      debugPrint('[Chat] Voice note send: $e');
+      return e;
+    });
+  }
+
   @override
   void dispose() {
     _typingDebounce?.cancel();
     _msgSub?.cancel();
     _typingSub?.cancel();
     _stopTypingSub?.cancel();
+    _screenshotSub?.cancel();
     SocketService().leaveConversation(widget.conversationId);
     _textController.dispose();
     super.dispose();
@@ -356,8 +419,25 @@ class _ChatScreenState extends State<ChatScreen> {
                           ],
                         ),
                       ),
+                      // Simulated Screenshot Snooping Trigger
+                      GestureDetector(
+                        onTap: _simulateScreenshotAlert,
+                        child: Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.40),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            CupertinoIcons.shield_lefthalf_fill,
+                            color: GlassTheme.snapYellow,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       const Icon(CupertinoIcons.phone_fill, color: GlassTheme.iosBlue, size: 22),
-                      const SizedBox(width: 18),
+                      const SizedBox(width: 14),
                       const Icon(CupertinoIcons.videocam_fill, color: GlassTheme.iosBlue, size: 26),
                     ],
                   ),
@@ -406,7 +486,20 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: const Icon(CupertinoIcons.camera_fill, color: Colors.black, size: 18),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          // Voice Note recording button
+                          GestureDetector(
+                            onTap: _sendVoiceNote,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: GlassTheme.iosPink,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(CupertinoIcons.mic_fill, color: Colors.white, size: 18),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: TextField(
                               controller: _textController,
@@ -446,6 +539,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage msg, bool isDark) {
+    if (msg.isSystemAlert) {
+      return _buildSystemAlertBubble(msg);
+    }
+
+    if (msg.isVoiceNote) {
+      return _buildVoiceNoteBubble(msg, isDark);
+    }
+
     if (msg.isSnap) {
       return _buildSnapBubble(msg, isDark);
     }
@@ -480,6 +581,50 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemAlertBubble(ChatMessage msg) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.redAccent, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              msg.text,
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoiceNoteBubble(ChatMessage msg, bool isDark) {
+    return Align(
+      alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
+        child: _ChatVoiceNoteBubble(
+          durationSeconds: msg.voiceDurationSeconds,
+          isMe: msg.isMe,
+          isDark: isDark,
         ),
       ),
     );
@@ -576,3 +721,143 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+/// Interactive in-chat voice note bubble with dynamic animated waveform
+class _ChatVoiceNoteBubble extends StatefulWidget {
+  final int durationSeconds;
+  final bool isMe;
+  final bool isDark;
+
+  const _ChatVoiceNoteBubble({
+    required this.durationSeconds,
+    required this.isMe,
+    required this.isDark,
+  });
+
+  @override
+  State<_ChatVoiceNoteBubble> createState() => _ChatVoiceNoteBubbleState();
+}
+
+class _ChatVoiceNoteBubbleState extends State<_ChatVoiceNoteBubble>
+    with SingleTickerProviderStateMixin {
+  bool _isPlaying = false;
+  late AnimationController _controller;
+  final List<double> _bars = const [
+    0.3, 0.7, 0.4, 0.9, 1.0, 0.6, 0.3, 0.8,
+    0.5, 0.9, 0.6, 0.4, 0.7, 0.5, 0.3,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: widget.durationSeconds),
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() => _isPlaying = false);
+        _controller.reset();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    HapticFeedback.lightImpact();
+    setState(() => _isPlaying = !_isPlaying);
+    if (_isPlaying) {
+      _controller.forward();
+    } else {
+      _controller.stop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: widget.isMe
+                ? GlassTheme.iosBlue.withValues(alpha: 0.82)
+                : (widget.isDark ? Colors.white.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.70)),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: widget.isMe ? 0.35 : (widget.isDark ? 0.20 : 0.80)),
+            ),
+          ),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final progress = _controller.value;
+              final currentSec = (progress * widget.durationSeconds).round();
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: _toggle,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isPlaying ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+                        color: widget.isMe ? GlassTheme.iosBlue : Colors.black87,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Row(
+                    children: List.generate(_bars.length, (idx) {
+                      final barProgress = idx / _bars.length;
+                      final isPlayed = progress >= barProgress;
+                      final baseH = _bars[idx] * 22;
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        width: 3.0,
+                        height: _isPlaying
+                            ? (baseH + (isPlayed ? 3 : 0)).clamp(4.0, 24.0)
+                            : baseH.clamp(4.0, 24.0),
+                        decoration: BoxDecoration(
+                          color: isPlayed
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.40),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    "0:${currentSec.toString().padLeft(2, '0')}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
